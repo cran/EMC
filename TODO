@@ -1,0 +1,35 @@
+
+### $Id: TODO,v 1.7 2008/01/11 02:31:12 goswami Exp $
+
+++ implement the fixed-time case: 
+
+++++ use R_alloc & realloc on draws and properly register the draws
+
+++++ at the end R_alloc the SEXPCurrDraws and return it
+
+
+ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+
+++ use gctorture(TRUE) and check for memory leaks
+
+++ allow MHPropNewFunc to be NULL, in which case use the
+   MHRWMPropDispArr argument
+
+++ write the C end for MHPropNewFunc with a rmvnorm function and stuff
+also, document it that if a vector or matrix is provided then it gets
+multiplied by 'temperLadder[ii]' to scale it properly for different
+temperature levels
+
+++ should make_draws be made a function pointer?
+
+++ some of the C functions are too long, break them
+
+
+ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+
+++ implement the temperature range: "statisticsList = NULL" not yet implemented
+
+
+

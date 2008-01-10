@@ -1,0 +1,66 @@
+
+### $Id: README,v 1.4 2008/01/11 04:24:42 goswami Exp $
+
+
+                        README for the EMC package
+                        --------------------------
+
+
+================================================================================
+QQ.     
+        What does this package has to offer over existing ones for
+        doing MCMC (e.g., mcmc)?
+                        
+
+AA.     
+        There are many new features in this package as listed below:
+
+        i.     
+                The function randomWalkMetropolis is a generalization
+                of the metrop function found in the package mcmc, in
+                that it lets the user provide arbitrary symmetric
+                proposals, not necessarily (multivariate) normal
+                (e.g., multivariate) t or uniform).
+                        
+        ii.
+                The MetropolisHastings function is a generalization of
+                randomWalkMetropolis function in that it lets the user
+                provide asymmetric proposals.
+                        
+        iii.      
+                The functions evolMonteCarlo, findMaxTemper and
+                placeTempers are implementations of new published
+                research materials, see the references in the help
+                pages.  
+                
+
+
+================================================================================
+QQ.     
+        Why did you write the back-end of this package in C and not in R?
+
+
+AA.
+        This software grew out of the C code base which was used by
+        the author in his research. He used to implement the
+        logTarDensFunc, MHPropNewFunc and the logMHPropDensFunc in C
+        for faster (research) speed.
+                                                                     
+        The interface of this package, however, needs that the user
+        provides the above-mentioned functions implemented in R, which
+        slows down the underlying C code because of constant back and
+        forth between the C-space and the R-space. 
+
+        There is TODO feature of this package, which will be only
+        beneficial to the advanced user who knows how to make R and C
+        talk. One of the future releases of this package will
+        entertain the above-mentioned user-provided functions written
+        in C by the user. Of course, that will entail building the
+        package from source by the user without errors, but hey, here
+        the assumption is that the user is advanced! And then things
+        will be as fast as it gets, due to minimal back and forth
+        between the C-space and the R-space.
+
+
+
+                ---Happy coding and research!---

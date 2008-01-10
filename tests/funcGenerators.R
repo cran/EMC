@@ -1,0 +1,245 @@
+
+### $Id: funcGenerators.R,v 1.3 2008/01/11 02:31:17 goswami Exp $
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+## The Cigar-shaped distribution with (symmetric) normal-proposal
+CigarShapedFuncGenerator1 <-
+    function (seed = 13579)
+{
+    set.seed(seed)    
+    dd     <- 2
+    ARDisp <-
+        function (rho)
+        {
+            tmp <- rep(1, dd)
+            diag((1 - rho) * tmp) + rho * tmp %*% t(tmp)
+        }
+
+    means          <- c(1, 1)
+    disp           <- ARDisp(-0.95)
+    logTarDensFunc <-
+        function (draw, ...)
+            dmvnorm(draw, means, disp, log = TRUE)
+
+    proposalSD  <- c(1, 2)
+    propNewFunc <-
+        function (block, currentDraw, ...)
+        {
+            proposalDraw        <- currentDraw
+            proposalDraw[block] <- rnorm(1, currentDraw[block], proposalSD[block])
+            proposalDraw
+        }            
+    
+    list(logTarDensFunc  = logTarDensFunc,
+         propNewFunc     = propNewFunc)
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+## The Cigar-shaped distribution with independent t-proposal
+CigarShapedFuncGenerator2 <-
+    function (seed = 13579)
+{
+    set.seed(seed)    
+    dd     <- 2
+    ARDisp <-
+        function (rho)
+        {
+            tmp <- rep(1, dd)
+            diag((1 - rho) * tmp) + rho * tmp %*% t(tmp)
+        }
+
+    means          <- c(1, 1)
+    disp           <- ARDisp(-0.95)
+    logTarDensFunc <-
+        function (draw, ...)
+            dmvnorm(draw, means, disp, log = TRUE)
+
+    tDF         <- 3
+    propNewFunc <-
+        function (block, currentDraw, ...)
+        {
+            proposalDraw        <- currentDraw
+            proposalDraw[block] <- rt(1, tDF)
+            proposalDraw
+        }            
+    
+    logPropDensFunc <-
+        function (block, currentDraw, proposalDraw, ...)
+            dt(proposalDraw[block], tDF, log = TRUE)
+
+    list(logTarDensFunc  = logTarDensFunc,
+         propNewFunc     = propNewFunc,
+         logPropDensFunc = logPropDensFunc)
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+## The V-shaped distribution
+VShapedFuncGenerator <-
+    function (seed = 13579)
+{
+    set.seed(seed)    
+    dd     <- 2
+    ARDisp <-
+        function (rho)
+        {
+            tmp <- rep(1, dd)
+            diag((1 - rho) * tmp) + rho * tmp %*% t(tmp)
+        }
+
+    nMixComps  <- 2
+    logWeights <- log(rep(1 / nMixComps, nMixComps))
+    meanMat    <- matrix(c(1, 1, 15, 1), nMixComps, byrow = TRUE)
+    dispParam  <- c(-0.95, 0.95)
+    dispArr    <- array(dim = c(2, 2, nMixComps))
+    for (ii in seq_len(nMixComps)) {
+        dispArr[ , , ii] <- ARDisp(dispParam[ii])
+    }
+    logTarDensFunc <-
+        function (draw, ...)
+        {
+            ld <- sapply(seq_len(nMixComps), FUN =
+                         function (ii)
+                     {
+                         dmvnorm(draw, meanMat[ii, ], dispArr[ , , ii], log = TRUE)
+                     })
+            ww <- logWeights + ld
+            mm <- max(ww)
+            mm + log(sum(exp(ww - mm)))
+        }
+    
+    MHProposalSD  <- c(1.0, 1.0)
+    MHPropNewFunc <-
+        function (temperature, block, currentDraw, ...)
+        {
+            proposalDraw        <- currentDraw
+            proposalDraw[block] <- rnorm(1, currentDraw[block],
+                                         sqrt(temperature) * MHProposalSD[block])
+            proposalDraw
+        }
+
+    list(logTarDensFunc = logTarDensFunc,
+         MHPropNewFunc  = MHPropNewFunc)
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+## The W-shaped distribution
+WShapedFuncGenerator <-
+    function (seed = 13579)
+{
+    set.seed(seed)    
+    dd     <- 2
+    ARDisp <-
+        function (rho)
+        {
+            tmp <- rep(1, dd)
+            diag((1 - rho) * tmp) + rho * tmp %*% t(tmp)
+        }
+
+    nMixComps  <- 4
+    logWeights <- log(rep(1 / nMixComps, nMixComps))
+    meanMat    <- matrix(c(-12, 1, -4, 1, 4, 1, 12, 1), nMixComps, byrow = TRUE)
+    dispParam  <- c(-0.95, 0.95, -0.95, 0.95)
+    dispArr    <- array(dim = c(2, 2, nMixComps))
+    for (ii in seq_len(nMixComps)) {
+        dispArr[ , , ii] <- ARDisp(dispParam[ii])
+    }
+    logTarDensFunc <-
+        function (draw, ...)
+        {
+            ld <- sapply(seq_len(nMixComps), FUN =
+                         function (ii)
+                     {
+                         dmvnorm(draw, meanMat[ii, ], dispArr[ , , ii], log = TRUE)
+                     })
+            ww <- logWeights + ld
+            mm <- max(ww)
+            mm + log(sum(exp(ww - mm)))
+        }
+    
+    MHProposalSD  <- c(0.8, 0.8)
+    MHPropNewFunc <-
+        function (temperature, block, currentDraw, ...)
+        {
+            proposalDraw        <- currentDraw
+            proposalDraw[block] <- rnorm(1, currentDraw[block],
+                                         sqrt(temperature) * MHProposalSD[block])
+            proposalDraw
+        }
+
+    list(logTarDensFunc = logTarDensFunc,
+         MHPropNewFunc  = MHPropNewFunc)
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### The unimodal normal distribution
+uniModeFuncGenerator <-
+    function (seed = 13579)
+{
+    set.seed(seed)
+    dd             <- 2
+    mean           <- rep(0, dd)
+    disp           <- diag(dd)
+    logTarDensFunc <-
+        function (draw, ...)
+            dmvnorm(draw, mean, disp, log = TRUE)
+    
+    MHProposalSD  <- c(2.5, 2.5)
+    MHPropNewFunc <-
+        function (temperature, block, currentDraw, ...)
+        {
+            proposalDraw        <- currentDraw
+            proposalDraw[block] <- rnorm(1, currentDraw[block],
+                                         sqrt(temperature) * MHProposalSD[block])
+            proposalDraw
+        }
+    
+    list(logTarDensFunc = logTarDensFunc,
+         MHPropNewFunc  = MHPropNewFunc)    
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### The twenty-mode problem
+twentyModeFuncGenerator <-
+    function (seed = 13579)
+{
+    set.seed(seed)
+    params     <- read.table(file = 'twentyModeParams.txt', header = F)
+    nMixComps  <- 20
+    logWeights <- log(params[ , 1])
+    meanMat    <- as.matrix(params[ , c(2, 3)])    
+    dispArr    <- array(dim = c(2, 2, nMixComps))
+    for (ii in seq_len(nMixComps)) {
+        dispArr[ , , ii] <- params[ii, 4]^2 * diag(2)
+    }    
+    logTarDensFunc <-
+        function (draw, ...)
+        {
+            ld <- sapply(seq_len(nMixComps), FUN =
+                         function (ii)
+                     {
+                         dmvnorm(draw, meanMat[ii, ], dispArr[ , , ii], log = TRUE)
+                     })
+            ww <- logWeights + ld
+            mm <- max(ww)
+            mm + log(sum(exp(ww - mm)))
+        }
+    
+    MHProposalSD  <- c(0.25, 0.25)
+    MHPropNewFunc <-
+        function (temperature, block, currentDraw, ...)
+        {
+            proposalDraw        <- currentDraw
+            proposalDraw[block] <- rnorm(1, currentDraw[block],
+                                         sqrt(temperature) * MHProposalSD[block])
+            proposalDraw
+        }
+    
+    list(logTarDensFunc = logTarDensFunc,
+         MHPropNewFunc  = MHPropNewFunc)    
+}

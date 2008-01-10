@@ -1,0 +1,18 @@
+
+### $Id: NAMESPACE,v 1.8 2008/01/11 02:31:12 goswami Exp $
+
+useDynLib(EMC, TOEMCMainC)
+
+export(randomWalkMetropolis,
+       MetropolisHastings,
+       parallelTempering,
+       evolMonteCarlo,
+       findMaxTemper,
+       placeTempers,
+       print.EMC,
+       print.EMCMaxTemper,
+       print.EMCPlaceTempers)
+
+S3Method(print, EMC)
+S3Method(print, EMCMaxTemper)
+S3Method(print, EMCPlaceTempers)

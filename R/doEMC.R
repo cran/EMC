@@ -1,0 +1,307 @@
+
+### $Id: doEMC.R,v 1.30 2008/01/11 02:19:08 goswami Exp $
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+### The following is the main 'workhorse' functions
+
+TOEMCMain <-
+    function (nIters,              
+              temperLadder,
+              startingVals,
+              logTarDensFunc,
+              MHPropNewFunc,
+              logMHPropDensFunc        = NULL, 
+              MHRWMPropDisp            = NULL,
+              MHBlocks                 = NULL,
+              MHBlockNTimes            = NULL,
+              isMHRWMVec               = NULL,
+              moveProbsList            = NULL,
+              moveNTimesList           = NULL,
+              SCRWMNTimes              = NULL,
+              SCRWMPropSD              = NULL,
+              moveSelectionCodesList   = NULL,
+              moveSelectionTempersList = NULL,
+              levelsSaveSampFor        = NULL,
+              saveFitness              = FALSE,
+              saveAcceptRatiosList     = FALSE, 
+              timeInSecs               = -1,
+              verboseLevel             = 0,
+              ...)   
+{
+    ptm <- proc.time( )
+    ## BEGIN: Error checks
+    nIters       <- .check.nIters(nIters)
+    temperLadder <- .check.temperLadder(temperLadder)
+    nLevels      <- as.integer(length(temperLadder))
+    startingVals <- .check.startingVals(startingVals, nLevels)
+    sampDim      <- as.integer(ncol(startingVals))
+    
+    logTarDensFunc       <- .check.logTarDensFunc(logTarDensFunc)
+    MHPropNewFunc        <- .check.MHPropNewFunc(MHPropNewFunc)
+    logMHPropDensFunc    <- .check.logMHPropDensFunc(logMHPropDensFunc)
+    MHRWMPropDispArr     <- .check.MHRWMPropDisp(MHRWMPropDisp,
+                                                 sampDim       = sampDim,
+                                                 nLevels       = nLevels,
+                                                 temperLadder  = temperLadder,
+                                                 MHPropNewFunc = MHPropNewFunc)
+
+    MHBlocks         <- .check.MHBlocks(MHBlocks, sampDim)
+    MHNBlocks        <- as.integer(length(MHBlocks))
+    MHBlockNTimes    <- .check.MHBlockNTimes(MHBlockNTimes, MHNBlocks)
+    isMHRWMVec       <- .check.isMHRWMVec(isMHRWMVec, MHNBlocks)
+
+    moveProbsList  <- .check.moveProbsList(moveProbsList, nLevels)
+    moveNTimesList <- .check.moveNTimesList(moveNTimesList,
+                                            moveProbsList = moveProbsList,
+                                            nLevels       = nLevels)
+    
+    SCRWMPropSD <- .check.SCRWMPropSD(SCRWMPropSD, moveNTimesList)
+    SCRWMNTimes <- .check.SCRWMNTimes(SCRWMNTimes, moveNTimesList)
+
+    moveSelectionCodesList   <- .check.mSCList(moveSelectionCodesList,
+                                               moveNTimesList = moveNTimesList)
+    moveSelectionTempersList <- .check.mSTList(moveSelectionTempersList,
+                                               moveNTimesList = moveNTimesList,
+                                               temperColdest  = temperLadder[nLevels])
+
+    levelsSaveSampFor <- .check.levelsSaveSamplesFor(levelsSaveSampFor, nLevels)
+    saveFitness       <- .check.logical(saveFitness)    
+    timeInSecs        <- .check.timeInSecs(timeInSecs)      
+    verboseLevel      <- .check.integer(verboseLevel)  
+    procTimeFunc      <- as.function(proc.time)             
+    procTimeFuncEnv   <- new.env( )
+    doCallFunc        <- as.function(doCall)             
+    doCallFuncEnv     <- new.env( )
+    dotsList          <- list(...)
+    argsList          <- collectVarnames(ls( ))
+    ## E N D: Error checks
+
+    if (argsList$verboseLevel >= 3) {
+        cat('The processed arguments:\n')
+        print(argsList)
+    }
+    if (argsList$verboseLevel >= 1) cat('\nBEGIN: EMC\n')        
+    res <- .Call('TOEMCMainC', argsList)
+    if (argsList$verboseLevel >= 1) cat('E N D: EMC\n')
+
+    res$nIters               <- nIters
+    res$levelsSaveSampFor    <- levelsSaveSampFor
+    res$temperLadder         <- temperLadder
+    res$startingVals         <- startingVals
+    res$moveProbsList        <- moveProbsList
+    res$moveNTimesList       <- moveNTimesList
+    res$detailedAcceptRatios <- .get.detailedAcceptRatios(res$acceptRatiosList)
+
+    if (!saveAcceptRatiosList)
+        res$acceptRatiosList <- NULL
+
+    if (!any(is.na(ptm))) res$time <- proc.time( ) - ptm
+    class(res) <- 'EMC'
+    res
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+randomWalkMetropolis <-
+    function (nIters,              
+              startingVal,
+              logTarDensFunc,
+              propNewFunc,
+              MHBlocks      = NULL,
+              MHBlockNTimes = NULL,
+              saveFitness   = FALSE, 
+              verboseLevel  = 0,
+              ...)     
+{
+    if (is.null(propNewFunc)) {
+        MHPropNewFunc <- NULL
+    }
+    else {
+        propNewFunc <- .check.func.do(propNewFunc, 
+                                      argsReq = c('block', 'currentDraw', '...'))
+        MHPropNewFunc <- 
+            function (temperature, block, currentDraw, ...)
+                propNewFunc(block, currentDraw, ...)     
+    }
+
+    res <- TOEMCMain(nIters            = nIters,              
+                     temperLadder      = c(1),
+                     startingVals      = startingVal,
+                     logTarDensFunc    = logTarDensFunc,
+                     logMHPropDensFunc = NULL, 
+                     MHPropNewFunc     = MHPropNewFunc,
+                     MHBlocks          = MHBlocks,
+                     MHBlockNTimes     = MHBlockNTimes,
+                     moveProbsList     = list(MH = 1.0),
+                     moveNTimesList    = list(MH = 1),
+                     saveFitness       = saveFitness,
+                     verboseLevel      = verboseLevel,
+                     ...)
+
+    res$startingVal <- startingVal
+    procFinal1(res)
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MetropolisHastings <-
+    function (nIters,              
+              startingVal,
+              logTarDensFunc,
+              propNewFunc,
+              logPropDensFunc,
+              MHBlocks      = NULL,
+              MHBlockNTimes = NULL,
+              saveFitness   = FALSE, 
+              verboseLevel  = 0,
+              ...)    
+{
+    if (is.null(propNewFunc)) {
+        MHPropNewFunc <- NULL
+    }
+    else {
+        propNewFunc <- .check.func.do(propNewFunc, 
+                                      argsReq = c('block', 'currentDraw', '...'))
+        MHPropNewFunc <-
+            function (temperature, block, currentDraw, ...)
+                propNewFunc(block, currentDraw, ...)
+    }    
+
+    if (is.null(logPropDensFunc)) {
+        logMHPropDensFunc <- NULL
+    }
+    else {
+        logPropDensFunc <- .check.func.do(logPropDensFunc,
+                                          argsReq = c('block', 'currentDraw',
+                                          'proposalDraw', '...'))
+        logMHPropDensFunc <-
+            function (temperature, block, currentDraw, proposalDraw, ...)
+                logPropDensFunc(block, currentDraw, proposalDraw, ...)
+    }
+
+    res <- TOEMCMain(nIters            = nIters,              
+                     temperLadder      = c(1),
+                     startingVals      = startingVal,
+                     logTarDensFunc    = logTarDensFunc,
+                     MHPropNewFunc     = MHPropNewFunc,
+                     logMHPropDensFunc = logMHPropDensFunc,
+                     MHBlocks          = MHBlocks,
+                     MHBlockNTimes     = MHBlockNTimes,
+                     moveProbsList     = list(MH = 1.0),
+                     moveNTimesList    = list(MH = 1),
+                     saveFitness       = saveFitness,
+                     verboseLevel      = verboseLevel,
+                     ...)
+
+    res$startingVal <- startingVal
+    procFinal1(res)
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+parallelTempering <-
+    function (nIters,              
+              temperLadder,
+              startingVals,
+              logTarDensFunc,
+              MHPropNewFunc,
+              logMHPropDensFunc = NULL, 
+              MHBlocks          = NULL,
+              MHBlockNTimes     = NULL,
+              moveProbsList     = NULL,
+              moveNTimesList    = NULL,
+              levelsSaveSampFor = NULL,
+              saveFitness       = FALSE, 
+              verboseLevel      = 0,
+              ...)          
+{
+    if (is.null(moveProbsList))
+        moveProbsList <- list(MH = 1.0)
+    
+    if (is.null(moveNTimesList)) {
+        temperLadder   <- .check.temperLadder(temperLadder)
+        nLevels        <- length(temperLadder)
+        moveNTimesList <- list(MH = 1,
+                               RE = nLevels)
+    }
+
+    movenamesAllowed <- c('MH', 'RE')
+    .check.moveList.do(moveProbsList, implementedMovenames  = movenamesAllowed)
+    .check.moveList.do(moveNTimesList, implementedMovenames = movenamesAllowed)
+                       
+    res <- TOEMCMain(nIters            = nIters,              
+                     temperLadder      = temperLadder,
+                     startingVals      = startingVals,
+                     logTarDensFunc    = logTarDensFunc,
+                     MHPropNewFunc     = MHPropNewFunc,
+                     MHBlocks          = MHBlocks,
+                     MHBlockNTimes     = MHBlockNTimes,
+                     logMHPropDensFunc = logMHPropDensFunc, 
+                     moveProbsList     = moveProbsList,
+                     moveNTimesList    = moveNTimesList,
+                     levelsSaveSampFor = levelsSaveSampFor,
+                     saveFitness       = saveFitness,
+                     verboseLevel      = verboseLevel,
+                     ...)
+    res
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+evolMonteCarlo <-
+    function (nIters,              
+              temperLadder,
+              startingVals,
+              logTarDensFunc,
+              MHPropNewFunc,
+              logMHPropDensFunc = NULL, 
+              MHBlocks          = NULL,
+              MHBlockNTimes     = NULL,  
+              moveProbsList     = NULL,
+              moveNTimesList    = NULL,
+              SCRWMNTimes       = NULL, 
+              SCRWMPropSD       = NULL, 
+              levelsSaveSampFor = NULL,
+              saveFitness       = FALSE,
+              verboseLevel      = 0,
+              ...)    
+{
+    if (is.null(moveNTimesList)) {
+        temperLadder   <- .check.temperLadder(temperLadder)
+        nLevels        <- length(temperLadder)
+        moveNTimesList <- list(MH = 1,
+                               RE = nLevels)
+    }
+
+    res <- TOEMCMain(nIters            = nIters,              
+                     temperLadder      = temperLadder,
+                     startingVals      = startingVals,
+                     logTarDensFunc    = logTarDensFunc,
+                     MHPropNewFunc     = MHPropNewFunc,
+                     MHBlocks          = MHBlocks,
+                     MHBlockNTimes     = MHBlockNTimes,
+                     logMHPropDensFunc = logMHPropDensFunc, 
+                     moveProbsList     = moveProbsList,
+                     moveNTimesList    = moveNTimesList,
+                     SCRWMNTimes       = SCRWMNTimes,
+                     SCRWMPropSD       = SCRWMPropSD,
+                     levelsSaveSampFor = levelsSaveSampFor,
+                     saveFitness       = saveFitness,
+                     verboseLevel      = verboseLevel,
+                     ...)
+    res
+}
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+print.EMC <-
+    function (x, ...)
+{
+    if (!is.null(x$temperLadder)) {
+        cat('\nThe temperature ladder:\n')
+        print(x$temperLadder, ...)
+    }
+    cat('\nThe overall acceptance rate summary:\n')
+    print(x$acceptRatios, ...)
+    cat('\n')
+}

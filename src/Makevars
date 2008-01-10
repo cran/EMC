@@ -1,0 +1,3 @@
+
+
+PKG_CFLAGS = # -Wall -pedantic #-DDEBUG_OBJECTS=1 
