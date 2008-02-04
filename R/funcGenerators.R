@@ -1,11 +1,45 @@
 
-### $Id: funcGenerators.R,v 1.3 2008/01/11 02:31:17 goswami Exp $
+
+###  $Id: funcGenerators.R,v 1.2 2008/02/04 17:01:35 goswami Exp $
+###  
+###  File:    ladder.R
+###  Package: EMC
+###  
+###  Copyright (C) 2006-present Gopi Goswami
+###
+###  This program is free software; you can redistribute it and/or modify
+###  it under the terms of the GNU General Public License as published by
+###  the Free Software Foundation; either version 2 of the License, or
+###  (at your option) any later version.
+###
+###  This program is distributed in the hope that it will be useful,
+###  but WITHOUT ANY WARRANTY; without even the implied warranty of
+###  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+###  GNU General Public License for more details.
+###
+###  For a copy of the GNU General Public License please write to the
+###  Free Software Foundation, Inc.
+###  59 Temple Place, Suite 330.
+###  Boston, MA  02111-1307 USA.
+###
+###  For bugs in the code please contact:
+###  <goswami@stat.harvard.edu>
+###
+###  SYNOPSIS
+###
+###
+###
+###  DESCRIPTION
+###
+###
+###
+
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 ## The Cigar-shaped distribution with (symmetric) normal-proposal
 CigarShapedFuncGenerator1 <-
-    function (seed = 13579)
+    function (seed)
 {
     set.seed(seed)    
     dd     <- 2
@@ -39,7 +73,7 @@ CigarShapedFuncGenerator1 <-
 
 ## The Cigar-shaped distribution with independent t-proposal
 CigarShapedFuncGenerator2 <-
-    function (seed = 13579)
+    function (seed)
 {
     set.seed(seed)    
     dd     <- 2
@@ -78,7 +112,7 @@ CigarShapedFuncGenerator2 <-
             
 ## The V-shaped distribution
 VShapedFuncGenerator <-
-    function (seed = 13579)
+    function (seed)
 {
     set.seed(seed)    
     dd     <- 2
@@ -128,7 +162,7 @@ VShapedFuncGenerator <-
 
 ## The W-shaped distribution
 WShapedFuncGenerator <-
-    function (seed = 13579)
+    function (seed)
 {
     set.seed(seed)    
     dd     <- 2
@@ -178,7 +212,7 @@ WShapedFuncGenerator <-
 
 ### The unimodal normal distribution
 uniModeFuncGenerator <-
-    function (seed = 13579)
+    function (seed)
 {
     set.seed(seed)
     dd             <- 2
@@ -206,7 +240,7 @@ uniModeFuncGenerator <-
 
 ### The twenty-mode problem
 twentyModeFuncGenerator <-
-    function (seed = 13579)
+    function (seed)
 {
     set.seed(seed)
     params     <- read.table(file = 'twentyModeParams.txt', header = F)

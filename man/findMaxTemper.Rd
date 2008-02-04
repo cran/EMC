@@ -1,5 +1,5 @@
 
-%%% $Id: findMaxTemper.Rd,v 1.18 2008/01/11 04:12:41 goswami Exp $
+%%% $Id: findMaxTemper.Rd,v 1.20 2008/02/04 17:01:38 goswami Exp $
 
 \name{findMaxTemper}
 
@@ -35,15 +35,15 @@ findMaxTemper(nIters,
               \dots)   
 }
 
-\arguments{
+\arguments{  
   Below \code{sampDim} refers to the dimension of the sample space,
   \code{temperLadderLen} refers to the length of the temperature ladder,
-  and \code{levelsSaveSampForLen} refers to the length of 
+  and \code{levelsSaveSampForLen} refers to the length of
   \code{levelsSaveSampFor}. Note, this function calls
-  \code{evolMonteCarlo}, so some of the arguments below have the same
-  name and meaning as the corresponding ones for
-  \code{evolMonteCarlo}. \emph{See details below for explanation on
-    the following arguments}.
+  \code{\link{evolMonteCarlo}}, so some of the arguments below have the
+  same name and meaning as the corresponding ones for
+  \code{\link{evolMonteCarlo}}. \emph{See details below for explanation
+  on the following arguments}.
 
   \item{nIters}{\code{integer} \eqn{>} 0.}
 
@@ -100,6 +100,7 @@ findMaxTemper(nIters,
 
   \item{\dots}{optional arguments to be passed to \code{logTarDensFunc},
     \code{MHPropNewFunc} and \code{logMHPropDensFunc}.}
+
 }
 
 \details{
@@ -107,11 +108,11 @@ findMaxTemper(nIters,
   introduced in section 4.1 of Goswami and Liu (2007).
 
   \describe{
-    \item{\code{statsFuncList}}{\cr
-      The user specifies this list of functions, each of which is
-      known to be sensitive to the presence of modes. For example, if
-      both dimension 1 and 3 are sensitive to presence of modes, then
-      one could use:}
+
+    \item{\code{statsFuncList}}{The user specifies this list of
+      functions, each of which is known to be sensitive to the presence
+      of modes. For example, if both dimension 1 and 3 are sensitive to
+      presence of modes, then one could use:}
 
     \preformatted{
     coord1        <- function (xx) { xx[1] }
@@ -125,28 +126,28 @@ findMaxTemper(nIters,
     statsFuncList <- list(coord1, coord3)
     }
 
-    \item{\code{temperLadder}}{\cr
-      This is the temperature ladder needed for the first stage
-      preliminary run. One can either specify a temperature
-      ladder via \code{temperLadder} or specify \code{temperLimits},
-      \code{ladderLen}, \code{scheme} and \code{schemeParam}. For
-      details on the later set of parameters, see below. Note,
-      \code{temperLadder} overrides \code{temperLimits},
-      \code{ladderLen}, \code{scheme} and \code{schemeParam}.}
+    \item{\code{temperLadder}}{This is the temperature ladder needed for
+      the first stage preliminary run. One can either specify a
+      temperature ladder via \code{temperLadder} or specify
+      \code{temperLimits}, \code{ladderLen}, \code{scheme} and
+      \code{schemeParam}. For details on the later set of parameters,
+      see below. Note, \code{temperLadder} overrides
+      \code{temperLimits}, \code{ladderLen}, \code{scheme} and
+      \code{schemeParam}.}
     
-    \item{\code{temperLimits}}{\cr
-      \code{temperLimits = c(lowerLimit, upperLimit)} is a two-tuple
-      of positive numbers, where the \code{lowerLimit} is usually 1
-      and \code{upperLimit} is a number in [100, 1000]. If stochastic
-      optimization (via sampling) is the goal, then \code{lowerLimit} is
-      taken to be in [0, 1]. Often the \code{upperLimit} is the maximum
-      temperature as suggested by \code{\link{findMaxTemper}}.}
+    \item{\code{temperLimits}}{\code{temperLimits = c(lowerLimit,
+      upperLimit)} is a two-tuple of positive numbers, where the
+      \code{lowerLimit} is usually 1 and \code{upperLimit} is a number
+      in [100, 1000]. If stochastic optimization (via sampling) is the
+      goal, then \code{lowerLimit} is taken to be in [0, 1]. Often the
+      \code{upperLimit} is the maximum temperature as suggested by
+      \code{\link{findMaxTemper}}.}
 
-    \item{\code{ladderLen}, \code{scheme} and \code{schemeParam}}{\cr
-      These three parameters are required (along with
-      \code{temperLimits}) if \code{temperLadder} \emph{is not}
-      provided. We recommend taking \code{ladderLen} in [15, 30]. The
-      allowed choices for \code{scheme} and \code{schemeParam} are:}
+    \item{\code{ladderLen}, \code{scheme} and \code{schemeParam}}{These
+      three parameters are required (along with \code{temperLimits}) if
+      \code{temperLadder} \emph{is not} provided. We recommend taking
+      \code{ladderLen} in [15, 30]. The allowed choices for
+      \code{scheme} and \code{schemeParam} are:}
 
     \tabular{rl}{
       \code{scheme} \tab \code{schemeParam} \cr
@@ -162,43 +163,41 @@ findMaxTemper(nIters,
     }
 
     We recommended using \code{scheme = 'exponential'} and
-    \code{schemeParam} in [1.5, 2].
+    \code{schemeParam} in [0.3, 0.5].
     
-    \item{\code{cutoffDStats}}{\cr
-      This cutoff comes from \eqn{Normal_1(0, 1)}, the standard normal
-      distribution (Goswami and Liu, 2007); the default value 1.96 is a
-      conservative cutoff. Note if you have more than one statistic in
-      \code{statsFuncList}, which is usually the case, using this cutoff
-      may result in different suggested maximum temperatures (as can be
-      seen by calling the \code{print} function on the result of
-      \code{findMaxTemper}). A conservative recommendation is that you
-      choose the maximum of the suggested temperatures as the final
-      maximum temperature for use in \code{placeTempers} and later in
-      \code{parallelTempering} or \code{evolMonteCarlo}.}
+    \item{\code{cutoffDStats}}{This cutoff comes from \eqn{Normal_1(0,
+      1)}, the standard normal distribution (Goswami and Liu, 2007); the
+      default value 1.96 is a conservative cutoff. Note if you have more
+      than one statistic in \code{statsFuncList}, which is usually the
+      case, using this cutoff may result in different suggested maximum
+      temperatures (as can be seen by calling the \code{print} function
+      on the result of \code{findMaxTemper}). A conservative
+      recommendation is that you choose the maximum of the suggested
+      temperatures as the final maximum temperature for use in
+      \code{placeTempers} and later in \code{parallelTempering} or
+      \code{evolMonteCarlo}.}
 
-    \item{\code{cutoffESS}}{\cr
-      \code{cutoffESS} is a cutoff for the effective sample size (ESS)
+    \item{\code{cutoffESS}}{a cutoff for the effective sample size (ESS)
       of the underlying Markov chain ergodic estimator and the
       importance sampling estimators.}
     
-    \item{\code{guideMe}}{\cr
-      If \code{guideMe = TRUE}, then the function suggests different
-      modifications to alter the setting towards a re-run, in case there
-      are problems with the underlying MCMC run.}
+    \item{\code{guideMe}}{If \code{guideMe = TRUE}, then the function
+      suggests different modifications to alter the setting towards a
+      re-run, in case there are problems with the underlying MCMC run.}
 
-    \item{\code{doFullAnal}}{\cr
-      If \code{doFullAnal = TRUE}, then the search for the maximum
-      temperature is conducted among \emph{all} the levels of the
-      \code{temperLadder}. In case this switch is turned off, the search
-      for maximum temperature is done in a greedy (and faster) manner,
-      namely, search is stopped as soon as all the statistic(s) in the
-      \code{statsFuncList} find some maximum temperature(s). Note, the
-      greedy search may result in much higher maximum temperature (and
-      hence sub-optimal) than needed, so it is not recommended.}
+    \item{\code{doFullAnal}}{If \code{doFullAnal = TRUE}, then the
+      search for the maximum temperature is conducted among \emph{all}
+      the levels of the \code{temperLadder}. In case this switch is
+      turned off, the search for maximum temperature is done in a greedy
+      (and faster) manner, namely, search is stopped as soon as all the
+      statistic(s) in the \code{statsFuncList} find some maximum
+      temperature(s). Note, the greedy search may result in much higher
+      maximum temperature (and hence sub-optimal) than needed, so it is
+      not recommended.}
 
-    \item{\code{levelsSaveSampFor}}{\cr
-      This is passed to \code{evolMonteCarlo} for the underlying MCMC
-      run.}
+    \item{\code{levelsSaveSampFor}}{This is passed to
+      \code{evolMonteCarlo} for the underlying MCMC run.}
+
     }
 }
 
@@ -234,6 +233,7 @@ findMaxTemper(nIters,
     \code{statsFuncList} argument.}
 
   \item{time}{the time taken by the run.}
+
 }
 
 \note{
@@ -260,6 +260,7 @@ findMaxTemper(nIters,
 
     \code{levelsSaveSampFor}
     \tab \code{temperLadderLen}.
+
   }
 }
 
@@ -275,68 +276,20 @@ findMaxTemper(nIters,
   \code{\link{evolMonteCarlo}}}
 
 \examples{
-## The V-shaped distribution
-VShapedFuncGenerator <-
-    function (seed = 13579)
-{
-    set.seed(seed)    
-    dd     <- 2
-    ARDisp <-
-        function (rho)
-        {
-            tmp <- rep(1, dd)
-            diag((1 - rho) * tmp) + rho * tmp \%*\% t(tmp)
-        }
-
-    nMixComps  <- 2
-    logWeights <- log(rep(1 / nMixComps, nMixComps))
-    meanMat    <- matrix(c(1, 1, 15, 1), nMixComps, byrow = TRUE)
-    dispParam  <- c(-0.95, 0.95)
-    dispArr    <- array(dim = c(2, 2, nMixComps))
-    for (ii in seq_len(nMixComps)) {
-        dispArr[ , , ii] <- ARDisp(dispParam[ii])
-    }
-    logTarDensFunc <-
-        function (draw, ...)
-        {
-            ld <- sapply(seq_len(nMixComps), FUN =
-                         function (ii)
-                     {
-                         dmvnorm(draw, meanMat[ii, ], dispArr[ , , ii], log = TRUE)
-                     })
-            ww <- logWeights + ld
-            mm <- max(ww)
-            mm + log(sum(exp(ww - mm)))
-        }
-    
-    MHProposalSD  <- c(1.0, 1.0)
-    MHPropNewFunc <-
-        function (temperature, block, currentDraw, ...)
-        {
-            proposalDraw        <- currentDraw
-            proposalDraw[block] <- rnorm(1, currentDraw[block],
-                                         sqrt(temperature) * MHProposalSD[block])
-            proposalDraw
-        }
-
-    list(logTarDensFunc = logTarDensFunc,
-         MHPropNewFunc  = MHPropNewFunc)
-}
-
-
 coord1        <- function (xx) { xx[1] }
 ss            <- function (xx) { sum(xx) }
 pp            <- function (xx) { prod(xx) }
 statsFuncList <- list(coord1, ss, pp)
 maxTemperObj  <-
-    with(VShapedFuncGenerator( ),
-         findMaxTemper(nIters            = 10000,
+    with(VShapedFuncGenerator(-13579),
+         findMaxTemper(nIters            = 15000,
                        statsFuncList     = statsFuncList,
                        temperLadder      = c(20, 15, 10, 5, 1),
                        startingVals      = c(0, 0),
                        logTarDensFunc    = logTarDensFunc,
                        MHPropNewFunc     = MHPropNewFunc,
                        levelsSaveSampFor = seq_len(5),
+                       doFullAnal        = TRUE,
                        verboseLevel      = 1))
 print(maxTemperObj)
 print(names(maxTemperObj))

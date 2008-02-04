@@ -1,5 +1,5 @@
 
-%%% $Id: parallelTempering.Rd,v 1.20 2008/01/11 04:24:42 goswami Exp $
+%%% $Id: parallelTempering.Rd,v 1.21 2008/02/04 17:01:38 goswami Exp $
 
 \name{parallelTempering}
 
@@ -85,32 +85,33 @@ parallelTempering(nIters,
 
   \item{\dots}{optional arguments to be passed to \code{logTarDensFunc},
     \code{MHPropNewFunc} and \code{logMHPropDensFunc}.}
+  
 }
 
 \details{
   \describe{
-    \item{\code{MHPropNewFunc} and \code{logMHPropDensFunc}}{\cr
-      The \code{MHPropNewFunc} and the \code{logMHPropDensFunc} are called
-      multiple times by varying the \code{block} argument over 
+
+    \item{\code{MHPropNewFunc} and \code{logMHPropDensFunc}}{The
+      \code{MHPropNewFunc} and the \code{logMHPropDensFunc} are called
+      multiple times by varying the \code{block} argument over
       \code{1:length(MHBlocks)}, so these functions should know how to
-      generate a proposal from the \code{currentDraw} or to evaluate
-      the proposal density depending on which block was passed as the
+      generate a proposal from the \code{currentDraw} or to evaluate the
+      proposal density depending on which block was passed as the
       argument. \emph{See the example section for sample code.}}
 
-    \item{\code{MHBlocks} and \code{MHBlockNTimes}}{\cr
-      Blocking is an important and useful tool in MCMC that helps
-      speed up sampling and hence mixing. Example: Let \code{sampDim =
-        6}. Let we want to sample dimensions 1, 2, 4 as one block,
-      dimensions 3 and 5 as another and treat dimension 6 as the third
-      block. Suppose we want to sample the three blocks mentioned above 1,
-      5 and 10 times in each iteration, respectively. Then we could set
-      \code{MHBlocks = list(c(1, 2, 4), c(3, 5), 6)} and
-      \code{MHBlockNTimes = c(1, 5, 10)}}.
+    \item{\code{MHBlocks} and \code{MHBlockNTimes}}{Blocking is an
+      important and useful tool in MCMC that helps speed up sampling and
+      hence mixing. Example: Let \code{sampDim = 6}. Let we want to
+      sample dimensions 1, 2, 4 as one block, dimensions 3 and 5 as
+      another and treat dimension 6 as the third block. Suppose we want
+      to sample the three blocks mentioned above 1, 5 and 10 times in
+      each iteration, respectively. Then we could set \code{MHBlocks =
+      list(c(1, 2, 4), c(3, 5), 6)} and \code{MHBlockNTimes = c(1, 5,
+      10)}}.
 
-    \item{The parallel tempering algorithm}{\cr
-      The parallel tempering (PT; Liang and Wong, 2001) algorithm is
-      composed of the following moves:}
-    
+    \item{The parallel tempering algorithm}{The parallel tempering (PT;
+      Liang and Wong, 2001) algorithm is composed of the following
+      moves:}    
 
     \tabular{rl}{
       \acronym{MH} \tab Metropolis-Hastings or mutation \cr
@@ -121,10 +122,12 @@ parallelTempering(nIters,
     specifying what moves to employ using the following variables.
 
     \describe{
-      \item{\code{moveProbsList} and \code{moveNTimesList}}{\cr
-        The allowed names for components of \code{moveProbsList} and
-        \code{moveNTimesList} come from the abbreviated names of the moves
-        above. For example, the following specifications are valid:}
+
+      \item{\code{moveProbsList} and \code{moveNTimesList}}{The allowed
+        names for components of \code{moveProbsList} and
+        \code{moveNTimesList} come from the abbreviated names of the
+        moves above. For example, the following specifications are
+        valid:}
 
       \preformatted{
 moveProbsList = list(MH = 0.4,
@@ -137,22 +140,22 @@ moveNTimesList = list(MH = 1,
         }
     }    
 
-    \item{\code{levelsSaveSampFor}}{\cr
-      By default, samples are saved and returned for temperature level
-      \code{temperLadderLen}. The \code{levelsSaveSampFor} could be used to
-      save samples from other temperature levels as well (e.g.,
-      \code{levelsSaveSampFor = 1:temperLadderLen} saves samples from
-      all levels).}
+    \item{\code{levelsSaveSampFor}}{By default, samples are saved and
+      returned for temperature level \code{temperLadderLen}. The
+      \code{levelsSaveSampFor} could be used to save samples from other
+      temperature levels as well (e.g., \code{levelsSaveSampFor =
+      1:temperLadderLen} saves samples from all levels).}
 
-    \item{\code{saveFitness}}{\cr
-      The term \emph{fitness} refers to the function \eqn{H(x)}, where
-      the target density of interest is given by
+    \item{\code{saveFitness}}{The term \emph{fitness} refers to the
+      function \eqn{H(x)}, where the target density of interest is given
+      by:
 
       \deqn{g(x) \propto \exp[ -H(x) / \tau_{min} ]}
 
       \eqn{H(x)} is also known as the \emph{energy} function. By default,
       the fitness values are not saved, but one can do so by setting
       \code{saveFitness = TRUE}.}
+    
   }
 }
 
@@ -186,6 +189,7 @@ moveNTimesList = list(MH = 1,
   \item{levelsSaveSampFor}{the \code{levelsSaveSampFor} argument.}
 
   \item{time}{the time taken by the run.}
+  
 }
 
 \note{
@@ -219,6 +223,7 @@ moveNTimesList = list(MH = 1,
 
     \code{levelsSaveSampFor}
     \tab \code{temperLadderLen}.
+
   }
 }
 
@@ -234,57 +239,8 @@ moveNTimesList = list(MH = 1,
 \seealso{\code{\link{evolMonteCarlo}}}
 
 \examples{
-## The V-shaped distribution
-VShapedFuncGenerator <-
-    function (seed = 13579)
-{
-    set.seed(seed)    
-    dd     <- 2
-    ARDisp <-
-        function (rho)
-        {
-            tmp <- rep(1, dd)
-            diag((1 - rho) * tmp) + rho * tmp \%*\% t(tmp)
-        }
-
-    nMixComps  <- 2
-    logWeights <- log(rep(1 / nMixComps, nMixComps))
-    meanMat    <- matrix(c(1, 1, 15, 1), nMixComps, byrow = TRUE)
-    dispParam  <- c(-0.95, 0.95)
-    dispArr    <- array(dim = c(2, 2, nMixComps))
-    for (ii in seq_len(nMixComps)) {
-        dispArr[ , , ii] <- ARDisp(dispParam[ii])
-    }
-    logTarDensFunc <-
-        function (draw, ...)
-        {
-            ld <- sapply(seq_len(nMixComps), FUN =
-                         function (ii)
-                     {
-                         dmvnorm(draw, meanMat[ii, ], dispArr[ , , ii], log = TRUE)
-                     })
-            ww <- logWeights + ld
-            mm <- max(ww)
-            mm + log(sum(exp(ww - mm)))
-        }
-    
-    MHProposalSD  <- c(1.0, 1.0)
-    MHPropNewFunc <-
-        function (temperature, block, currentDraw, ...)
-        {
-            proposalDraw        <- currentDraw
-            proposalDraw[block] <- rnorm(1, currentDraw[block],
-                                         sqrt(temperature) * MHProposalSD[block])
-            proposalDraw
-        }
-
-    list(logTarDensFunc = logTarDensFunc,
-         MHPropNewFunc  = MHPropNewFunc)
-}
-
-
 samplerObj <-
-    with(VShapedFuncGenerator( ),
+    with(VShapedFuncGenerator(-13579),
          parallelTempering(nIters            = 2000,
                            temperLadder      = c(15, 6, 2, 1),
                            startingVals      = c(0, 0),

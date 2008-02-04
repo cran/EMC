@@ -1,8 +1,41 @@
 
-### $Id: doEMC.R,v 1.30 2008/01/11 02:19:08 goswami Exp $
+###  $Id: doEMC.R,v 1.33 2008/02/04 17:01:35 goswami Exp $
+###  
+###  File:    doEMC.R
+###  Package: EMC
+###  
+###  Copyright (C) 2006-present Gopi Goswami
+###
+###  This program is free software; you can redistribute it and/or modify
+###  it under the terms of the GNU General Public License as published by
+###  the Free Software Foundation; either version 2 of the License, or
+###  (at your option) any later version.
+###
+###  This program is distributed in the hope that it will be useful,
+###  but WITHOUT ANY WARRANTY; without even the implied warranty of
+###  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+###  GNU General Public License for more details.
+###
+###  For a copy of the GNU General Public License please write to the
+###  Free Software Foundation, Inc.
+###  59 Temple Place, Suite 330.
+###  Boston, MA  02111-1307 USA.
+###
+###  For bugs in the code please contact:
+###  <goswami@stat.harvard.edu>
+###
+###  SYNOPSIS
+###
+###
+###
+###  DESCRIPTION
+###
+###
+###
+
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-### The following is the main 'workhorse' functions
+### The following is the main 'workhorse' function
 
 TOEMCMain <-
     function (nIters,              
@@ -30,7 +63,7 @@ TOEMCMain <-
 {
     ptm <- proc.time( )
     ## BEGIN: Error checks
-    nIters       <- .check.nIters(nIters)
+    nIters       <- .check.numericWithLLim(nIters, 0)
     temperLadder <- .check.temperLadder(temperLadder)
     nLevels      <- as.integer(length(temperLadder))
     startingVals <- .check.startingVals(startingVals, nLevels)
@@ -67,7 +100,7 @@ TOEMCMain <-
     levelsSaveSampFor <- .check.levelsSaveSamplesFor(levelsSaveSampFor, nLevels)
     saveFitness       <- .check.logical(saveFitness)    
     timeInSecs        <- .check.timeInSecs(timeInSecs)      
-    verboseLevel      <- .check.integer(verboseLevel)  
+    verboseLevel      <- .check.numericWithLLim(verboseLevel, NA)  
     procTimeFunc      <- as.function(proc.time)             
     procTimeFuncEnv   <- new.env( )
     doCallFunc        <- as.function(doCall)             
@@ -118,7 +151,8 @@ randomWalkMetropolis <-
     }
     else {
         propNewFunc <- .check.func.do(propNewFunc, 
-                                      argsReq = c('block', 'currentDraw', '...'))
+                                      argsReq   = c('block', 'currentDraw', '...'),
+                                      retObjMsg = 'a numeric vector')
         MHPropNewFunc <- 
             function (temperature, block, currentDraw, ...)
                 propNewFunc(block, currentDraw, ...)     
@@ -161,7 +195,8 @@ MetropolisHastings <-
     }
     else {
         propNewFunc <- .check.func.do(propNewFunc, 
-                                      argsReq = c('block', 'currentDraw', '...'))
+                                      argsReq   = c('block', 'currentDraw', '...'),
+                                      retObjMsg = 'a numeric vector')
         MHPropNewFunc <-
             function (temperature, block, currentDraw, ...)
                 propNewFunc(block, currentDraw, ...)
@@ -171,9 +206,11 @@ MetropolisHastings <-
         logMHPropDensFunc <- NULL
     }
     else {
+        argsReq   <- c('block', 'currentDraw', 'proposalDraw', '...')
+        retObjMsg <- 'a numeric value'
         logPropDensFunc <- .check.func.do(logPropDensFunc,
-                                          argsReq = c('block', 'currentDraw',
-                                          'proposalDraw', '...'))
+                                          argsReq   = argsReq,
+                                          retObjMsg = retObjMsg)
         logMHPropDensFunc <-
             function (temperature, block, currentDraw, proposalDraw, ...)
                 logPropDensFunc(block, currentDraw, proposalDraw, ...)
@@ -265,7 +302,7 @@ evolMonteCarlo <-
               saveFitness       = FALSE,
               verboseLevel      = 0,
               ...)    
-{
+{    
     if (is.null(moveNTimesList)) {
         temperLadder   <- .check.temperLadder(temperLadder)
         nLevels        <- length(temperLadder)

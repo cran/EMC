@@ -1,0 +1,24 @@
+
+
+### $Id: ChangeLog,v 1.1 2008/02/04 22:29:08 goswami Exp $
+	
+	
+		CHANGES IN EMC VERSION 1.1
+
+	
+NEW FEATURES
+
+    o  	The '*FuncGenerator' function listings, which used to live in
+	example section of the help pages, making them huge, now live in a
+	file called R/funcGenerators.R and the functions therein are
+	exported, and they have a help page called 'utilsForExample'.
+
+
+
+BUG FIXES
+
+    o 	The help pages had a '\' (backslash) character in front of every
+	description list, due to an extra '\cr' command, removed those
+	occurrences. 
+	
+	

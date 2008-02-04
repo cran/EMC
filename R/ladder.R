@@ -1,5 +1,39 @@
 
-### $Id: ladder.R,v 1.23 2008/01/11 02:31:12 goswami Exp $
+
+###  $Id: ladder.R,v 1.25 2008/02/03 04:18:52 goswami Exp $
+###  
+###  File:    ladder.R
+###  Package: EMC
+###  
+###  Copyright (C) 2006-present Gopi Goswami
+###
+###  This program is free software; you can redistribute it and/or modify
+###  it under the terms of the GNU General Public License as published by
+###  the Free Software Foundation; either version 2 of the License, or
+###  (at your option) any later version.
+###
+###  This program is distributed in the hope that it will be useful,
+###  but WITHOUT ANY WARRANTY; without even the implied warranty of
+###  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+###  GNU General Public License for more details.
+###
+###  For a copy of the GNU General Public License please write to the
+###  Free Software Foundation, Inc.
+###  59 Temple Place, Suite 330.
+###  Boston, MA  02111-1307 USA.
+###
+###  For bugs in the code please contact:
+###  <goswami@stat.harvard.edu>
+###
+###  SYNOPSIS
+###
+###
+###
+###  DESCRIPTION
+###
+###
+###
+
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ### Function for the Parzen kernel.
@@ -104,8 +138,7 @@ MCObj <-
                                           gamma[seq.int(2, index)]))
         }
         if (varEst <= 0.0) {
-            print(match.call( ))
-            stop(paste('variance estimate in MCObj is negative:', varEst))
+            stop(paste('variance estimate in MCObj is non-positive:', varEst))
         }
     }
     
@@ -152,6 +185,12 @@ ISObj <-
 }
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+### Note the indirection through the use of getEMCOutFunc below in
+### .findMaxTemper.do.1 and .placeTempers.do.4 is done to facilitate
+### the package EMCC use the functionality developed in this
+### package. Look at the use of EMC:::findMaxTemper and
+### EMC:::placeTempers in EMCC/R/ladder.R
+
 ### Some helper functions for findMaxTemper
 
 .check.acceptRatios <-
@@ -162,14 +201,14 @@ ISObj <-
     if (acceptRatios[1] <= acceptRatioTooLow)
         cat('If possible, please make the "proposal density" for temperature = ',
             temper, '\n', 
-            'less dispersed, the observed acceptance rate = ', acceptRatios[1],
-            ' is below ', acceptRatioTooLow, '\n', sep = '')
+            'less dispersed, the minimum observed acceptance rate (= ',
+            acceptRatios[1], ') is below ', acceptRatioTooLow, '\n', sep = '')
     
     if (acceptRatios[1] >= acceptRatioTooHigh)
         cat('If possible, please make the "proposal density" for temperature = ',
             temper, '\n',
-            'more dispersed, the observed acceptance rate = ', acceptRatios[1],
-            'is above ', acceptRatioTooHigh, '\n', sep = '')            
+            'more dispersed, the minimum observed acceptance rate (= ',
+            acceptRatios[1], ') is above ', acceptRatioTooHigh, '\n', sep = '')
 }
 
 .info.find.1 <-
@@ -225,15 +264,17 @@ ISObj <-
               verboseLevel)
 {
     if (guideMe) {
-        if (any(curr$MCESS < cutoffESS))
-            warning('Please incerease the sample size or improve the ',
+        if (any(!is.na(curr$MCESS) &
+                (curr$MCESS < cutoffESS)))
+            warning('Please increase the sample size or improve the ',
                     '"proposal density";\n',
                     'some of the MCESSs (',  toString(round(curr$MCESS, 3)),
                     ') are too low\n',
                     call. = FALSE, immediate. = TRUE)
     
-        if (any(curr$ISESS < cutoffESS))
-            warning('Please incerease the sample size or improve the',
+        if (any(!is.na(curr$ISESS) &
+                (curr$ISESS < cutoffESS)))
+            warning('Please increase the sample size or improve the ',
                     '"proposal density";\n',
                     'some of the ISESSs (', toString(round(curr$ISESS, 3)),
                     ') are too low\n',
@@ -257,7 +298,7 @@ ISObj <-
               verboseLevel)
 {
     detailedAcceptRatios <- EMCOut$detailedAcceptRatios
-    acceptRatios         <- detailedAcceptRatios$MH[EMCOutPos, c(2, 4)]
+    acceptRatios         <- unlist(detailedAcceptRatios$MH[EMCOutPos, c(2, 4)])
     .info.find.1(guideMe              = guideMe,
                  acceptRatios         = acceptRatios,
                  temper               = temper,
@@ -299,6 +340,7 @@ ISObj <-
     function (pos,
               curr,
               prev,
+              statsFuncList,
               verboseLevel,
               eps = 0)
 {
@@ -310,26 +352,66 @@ ISObj <-
 
     logWeights <- -prev$fitness * (1 / curr$temper - 1 / prev$temper)
     for (ss in seq_along(curr$DStats)) {
+        if (verboseLevel >= 2) {
+            cat('Processing statistic:', ss, '\n')
+        }
+        
+        nErrors <- 0
+
         ## the MC variance computation on the curr        
-        tmpMC              <- MCObj(curr$statVals[ , ss],
-                                    verboseLevel = verboseLevel,
-                                    eps          = eps)
-        curr$MCEsts[ss]    <- tmpMC$est
-        curr$MCVarEsts[ss] <- tmpMC$var
-        curr$MCESS[ss]     <- tmpMC$ESS
+        tmpMC <- try(MCObj(curr$statVals[ , ss],
+                           verboseLevel = verboseLevel,
+                           eps          = eps),
+                     silent = TRUE)
+        if (inherits(tmpMC, 'try-error')) {
+            nErrors <- nErrors + 1
+            cat('\nThere was an error in computing the MC estimators for the ',
+                ss, '-th statistic in the statsFuncList:\n', sep = '')
+            print(statsFuncList[[ss]])
+            cat('\nThe summary of the statistics values:\n')
+            print(summary(curr$statVals[ , ss]))
+            cat('\n')
+            
+            curr$MCEsts[ss]    <- NA
+            curr$MCVarEsts[ss] <- NA
+            curr$MCESS[ss]     <- NA
+        }
+        else { 
+            curr$MCEsts[ss]    <- tmpMC$est
+            curr$MCVarEsts[ss] <- tmpMC$var
+            curr$MCESS[ss]     <- tmpMC$ESS
+        }
         
         ## the IS variance computation on the prev        
-        tmpIS              <- ISObj(prev$statVals[ , ss],
-                                    lWeights     = logWeights,
-                                    verboseLevel = verboseLevel,
-                                    eps          = eps)
-        curr$ISEsts[ss]    <- tmpIS$est
-        curr$ISVarEsts[ss] <- tmpIS$var
-        curr$ISESS         <- tmpIS$ESS
-        
-        curr$DStats[ss]    <- ((tmpMC$est - tmpIS$est) /
-                               sqrt(tmpMC$var + tmpIS$var))
-        
+        tmpIS <- try(ISObj(prev$statVals[ , ss],
+                           lWeights     = logWeights,
+                           verboseLevel = verboseLevel,
+                           eps          = eps),
+                     silent = TRUE)
+        if (inherits(tmpIS, 'try-error')) {
+            nErrors <- nErrors + 1
+            cat('\nThere was an error in computing the IS estimators for the ',
+                ss, '-th statistic in the statsFuncList:\n', sep = '')
+            print(statsFuncList[[ss]])
+            cat('\nThe summary of the statistics values:\n')
+            print(summary(prev$statVals[ , ss]))
+            cat('\n')
+            
+            curr$ISEsts[ss]    <- NA
+            curr$ISVarEsts[ss] <- NA
+            curr$ISESS         <- NA
+        }
+        else {         
+            curr$ISEsts[ss]    <- tmpIS$est
+            curr$ISVarEsts[ss] <- tmpIS$var
+            curr$ISESS         <- tmpIS$ESS
+        }
+
+        if (nErrors > 0)
+            curr$DStats[ss] <- NA
+        else
+            curr$DStats[ss]    <- ((tmpMC$est - tmpIS$est) /
+                                   sqrt(tmpMC$var + tmpIS$var))        
     }
     
     curr
@@ -446,10 +528,11 @@ ISObj <-
 
         curr            <- infoList[[pos]]
         prev            <- infoList[[pos - 1]]
-        curr            <- .update.infoListComp(pos          = pos,
-                                                curr         = curr,
-                                                prev         = prev,
-                                                verboseLevel = verboseLevel)
+        curr            <- .update.infoListComp(pos           = pos,
+                                                curr          = curr,
+                                                prev          = prev,
+                                                statsFuncList = statsFuncList,
+                                                verboseLevel  = verboseLevel)
         infoList[[pos]] <- curr
         
         .info.find.3(guideMe      = guideMe,
@@ -459,7 +542,8 @@ ISObj <-
                      pos          = pos,
                      verboseLevel = verboseLevel)
         
-        foundFor <- toFindFor[abs(curr$DStats) > cutoffDStats]
+        foundFor <- toFindFor[!is.na(curr$DStats) &
+                              (abs(curr$DStats) > cutoffDStats)]
         if (length(foundFor) > 0) {
             if (verboseLevel >= 1) {
                 cat('Found a plausible max temper: ', prev$temper, ', for ',
@@ -530,34 +614,37 @@ ISObj <-
               saveFitness,
               doFullAnal,
               verboseLevel,
+              getEMCOutFunc = NULL,
               ...)
 {
-    .get.EMCOutFunc <-
-        function (ladder, ...)
-        {
-            EMCOut <- 
-                TOEMCMain(nIters            = nIters,
-                          temperLadder      = ladder,
-                          startingVals      = startingVals,
-                          logTarDensFunc    = logTarDensFunc,
-                          MHPropNewFunc     = MHPropNewFunc, 
-                          logMHPropDensFunc = logMHPropDensFunc,
-                          moveProbsList     = list(MH = 1.0),
-                          moveNTimesList    = list(MH = 1),
-                          levelsSaveSampFor = seq_along(ladder),
-                          saveFitness       = TRUE,
-                          verboseLevel      = verboseLevel,
-                          ...)
-            
-            if (verboseLevel >= 1) {
-                cat('\nThe detailed MH acceptance ratios:\n')
-                print(EMCOut$detailedAcceptRatios$MH)
+    if (is.null(getEMCOutFunc)) {
+        getEMCOutFunc <-
+            function (ladder, ...)
+            {
+                EMCOut <- 
+                    TOEMCMain(nIters            = nIters,
+                              temperLadder      = ladder,
+                              startingVals      = startingVals,
+                              logTarDensFunc    = logTarDensFunc,
+                              MHPropNewFunc     = MHPropNewFunc, 
+                              logMHPropDensFunc = logMHPropDensFunc,
+                              moveProbsList     = list(MH = 1.0),
+                              moveNTimesList    = list(MH = 1),
+                              levelsSaveSampFor = seq_along(ladder),
+                              saveFitness       = TRUE,
+                              verboseLevel      = verboseLevel,
+                              ...)
+                
+                if (verboseLevel >= 1) {
+                    cat('\nThe detailed MH acceptance ratios:\n')
+                    print(EMCOut$detailedAcceptRatios$MH)
+                }
+                
+                EMCOut
             }
-            
-            EMCOut
-        }
+    }
 
-    .findMaxTemper.do.1(getEMCOutFunc     = .get.EMCOutFunc,
+    .findMaxTemper.do.1(getEMCOutFunc     = getEMCOutFunc,
                         statsFuncList     = statsFuncList,
                         temperLadder      = temperLadder,
                         cutoffDStats      = cutoffDStats,
@@ -600,14 +687,14 @@ findMaxTemper <-
                                        scheme       = scheme,
                                        schemeParam  = schemeParam)
     nLevels       <- length(temperLadder)
-    cutoffDStats  <- .check.cutoffDStats(cutoffDStats)
-    cutoffESS     <- .check.integerWithLLim(cutoffESS, 50)
+    cutoffDStats  <- .check.numericWithLLim(cutoffDStats, 0, retFunc = as.numeric)
+    cutoffESS     <- .check.numericWithLLim(cutoffESS, 50)
     guideMe       <- .check.logical(guideMe)    
 
     levelsSaveSampFor <- .check.levelsSaveSamplesFor(levelsSaveSampFor, nLevels)
     saveFitness       <- .check.logical(saveFitness)
     doFullAnal        <- .check.logical(doFullAnal)
-    verboseLevel      <- .check.integer(verboseLevel)
+    verboseLevel      <- .check.numericWithLLim(verboseLevel, NA)
 
     if (verboseLevel >= 1) cat('\nBEGIN: find maximum temperature\n')    
     ret <- .findMaxTemper.do(nIters            = nIters,
@@ -656,8 +743,10 @@ print.EMCMaxTemper <-
     tmp    <- data.frame(level       = rr2,
                          temperature = NA)
     for (ii in rr2) {
-        if (any(abs(x$DStats[ , ii]) >= x$cutoffDStats)) {
-            jj         <- min(rr1[abs(x$DStats[ , ii]) >= x$cutoffDStats])
+        filter <- (!is.na(x$DStats[ , ii]) &
+                   abs(x$DStats[ , ii]) >= x$cutoffDStats)
+        if (any(filter)) {
+            jj         <- min(rr1[filter])
             tmp[ii, 1] <- jj
             tmp[ii, 2] <- as.character(round(x$temperLadder[jj], 4))
         }
@@ -711,7 +800,7 @@ ARHatIS <-
 
     acceptRatiosMH <- detailedAcceptRatios$MH
     for (ii in seq_along(temperLadder)) 
-        .check.acceptRatios(acceptRatiosMH[ii, c(2, 4)], temperLadder[ii])    
+        .check.acceptRatios(unlist(acceptRatiosMH[ii, c(2, 4)]), temperLadder[ii])
     
     if (verboseLevel >= 1) {
         cat('The detailed MH accept ratios:\n')
@@ -785,6 +874,43 @@ ARHatIS <-
         cat('[NOTE:', endString, ']\n')        
 }
 
+.placeTempers.do.4 <-
+    function (nIters,
+              acceptRatioLimits,
+              ladderLenMax,
+              startingVals,
+              logTarDensFunc,
+              MHPropNewFunc,
+              logMHPropDensFunc,
+              temperLadder,
+              temperLimits,
+              ladderLen,
+              guideMe,
+              levelsSaveSampFor,
+              saveFitness,
+              verboseLevel,
+              getEMCOutFunc = NULL,
+              ...)
+{
+    if (!is.null(getEMCOutFunc))
+        return(getEMCOutFunc(temperLadder, ...))
+    
+    nLevels <- length(temperLadder)
+    EMCOut  <- TOEMCMain(nIters            = nIters,
+                         temperLadder      = temperLadder,
+                         startingVals      = startingVals,
+                         logTarDensFunc    = logTarDensFunc,
+                         MHPropNewFunc     = MHPropNewFunc, 
+                         logMHPropDensFunc = logMHPropDensFunc,
+                         moveProbsList     = list(MH = 0.3, RE = 0.7),
+                         moveNTimesList    = list(MH = 1, RE = nLevels),
+                         levelsSaveSampFor = seq_len(nLevels),
+                         saveFitness       = TRUE,
+                         verboseLevel      = verboseLevel,
+                         ...)
+    EMCOut
+}    
+
 .placeTempers.do.3 <-
     function (EMCOut,
               startLadder,
@@ -854,6 +980,13 @@ ARHatIS <-
             toString(round(c(tau1, tau2), 4)))
         cat('\n                       with CVSq of weights:',
             round(ARHatISList$CVSqWeights, 4), '\n')
+    }
+
+    if (abs(tau1 - tau2) <= 0) {
+        msg <- paste('The provided temperature ladder is too small, some more',
+                     'intermediate temperatures are needed in the interval: ',
+                     toString(round(c(temper1, temper2), 4)))
+        fatal(msg)
     }
     ARHatISList
 }
@@ -1050,19 +1183,21 @@ ARHatIS <-
               verboseLevel,
               ...)
 {
-    nLevels <- length(temperLadder)
-    EMCOut  <- TOEMCMain(nIters            = nIters,
-                         temperLadder      = temperLadder,
-                         startingVals      = startingVals,
-                         logTarDensFunc    = logTarDensFunc,
-                         logMHPropDensFunc = logMHPropDensFunc,
-                         MHPropNewFunc     = MHPropNewFunc, 
-                         moveProbsList     = list(MH = 0.3, RE = 0.7),
-                         moveNTimesList    = list(MH = 1, RE = nLevels),
-                         levelsSaveSampFor = seq_len(nLevels),
-                         saveFitness       = TRUE,
-                         verboseLevel      = verboseLevel,
-                         ...)
+    EMCOut <- .placeTempers.do.4(nIters            = nIters,
+                                 acceptRatioLimits = acceptRatioLimits,
+                                 ladderLenMax      = ladderLenMax,
+                                 startingVals      = startingVals,
+                                 logTarDensFunc    = logTarDensFunc,
+                                 MHPropNewFunc     = MHPropNewFunc,
+                                 logMHPropDensFunc = logMHPropDensFunc,
+                                 temperLadder      = temperLadder,
+                                 temperLimits      = temperLimits,
+                                 ladderLen         = ladderLen,
+                                 guideMe           = guideMe,
+                                 levelsSaveSampFor = levelsSaveSampFor,
+                                 saveFitness       = saveFitness,
+                                 verboseLevel      = verboseLevel,
+                                 ...)
 
     .info.place.1(guideMe              = guideMe,
                   detailedAcceptRatios = EMCOut$detailedAcceptRatios,
@@ -1108,13 +1243,13 @@ placeTempers <-
                                            ladderLen    = ladderLen,
                                            scheme       = scheme,
                                            schemeParam  = schemeParam)
-    ladderLenMax      <- .check.integerWithLLim(ladderLenMax, 3)
+    ladderLenMax      <- .check.numericWithLLim(ladderLenMax, 3)
     guideMe           <- .check.logical(guideMe)
     nLevels           <- length(temperLadder)
 
     levelsSaveSampFor <- .check.levelsSaveSamplesFor(levelsSaveSampFor, nLevels)
     saveFitness       <- .check.logical(saveFitness)
-    verboseLevel      <- .check.integer(verboseLevel)
+    verboseLevel      <- .check.numericWithLLim(verboseLevel, NA)
 
     if (verboseLevel >= 1) cat('\nBEGIN: place temperatures\n')    
     ret <- .placeTempers.do(nIters            = nIters,

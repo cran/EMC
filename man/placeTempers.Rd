@@ -1,5 +1,5 @@
 
-%%% $Id: placeTempers.Rd,v 1.15 2008/01/11 04:12:42 goswami Exp $
+%%% $Id: placeTempers.Rd,v 1.17 2008/02/04 17:01:38 goswami Exp $
 
 \name{placeTempers}
 
@@ -37,12 +37,12 @@ placeTempers(nIters,
 \arguments{
   Below \code{sampDim} refers to the dimension of the sample space,
   \code{temperLadderLen} refers to the length of the temperature ladder,
-  and \code{levelsSaveSampForLen} refers to the length of 
+  and \code{levelsSaveSampForLen} refers to the length of
   \code{levelsSaveSampFor}. Note, this function calls
-  \code{evolMonteCarlo}, so some of the arguments below have the same
-  name and meaning as the corresponding ones for
-  \code{evolMonteCarlo}. \emph{See details below for explanation on
-    the following arguments}.
+  \code{\link{evolMonteCarlo}}, so some of the arguments below have the
+  same name and meaning as the corresponding ones for
+  \code{\link{evolMonteCarlo}}. \emph{See details below for explanation
+  on the following arguments}.
 
   \item{nIters}{\code{integer} \eqn{>} 0.}
 
@@ -94,50 +94,49 @@ placeTempers(nIters,
 
   \item{\dots}{optional arguments to be passed to \code{logTarDensFunc},
     \code{MHPropNewFunc} and \code{logMHPropDensFunc}.}
+
 }
 
 \details{
   This function is based on the temperature placement method introduced
   in section 4.2 of Goswami and Liu (2007).
 
-  \describe{
-    \item{\code{acceptRatioLimits}}{\cr
-      This is a range for the estimated acceptance ratios for the random
-      exchange move for the consecutive temperature levels of the final
-      ladder. It is recommended that specified range is between 0.3 and
-      0.6.}
+  \describe{ \item{\code{acceptRatioLimits}}{This is a range for the
+    estimated acceptance ratios for the random exchange move for the
+    consecutive temperature levels of the final ladder. It is
+    recommended that specified range is between 0.3 and 0.6.}
     
-    \item{\code{ladderLenMax}}{\cr
-      It is preferred that one specifies \code{acceptRatioLimits} for
-      constructing the final temperature ladder. However, If one has
-      some computational limitations then one could also specify
-      \code{ladderLenMax} which will limit the length of the final
-      temperature ladder produced. This also serves as an upper bound
-      on the number of temperature levels while placing the intermediate
-      temperatures using the \code{acceptRatioLimits}.}
+    \item{\code{ladderLenMax}}{It is preferred that one specifies
+      \code{acceptRatioLimits} for constructing the final temperature
+      ladder. However, If one has some computational limitations then
+      one could also specify \code{ladderLenMax} which will limit the
+      length of the final temperature ladder produced. This also serves
+      as an upper bound on the number of temperature levels while
+      placing the intermediate temperatures using the
+      \code{acceptRatioLimits}.}
 
-    \item{\code{temperLadder}}{\cr
-      This is the temperature ladder needed for the second stage
-      preliminary run. One can either specify a temperature
-      ladder via \code{temperLadder} or specify \code{temperLimits},
-      \code{ladderLen}, \code{scheme} and \code{schemeParam}. For
-      details on the later set of parameters, see below. Note,
-      \code{temperLadder} overrides \code{temperLimits},
-      \code{ladderLen}, \code{scheme} and \code{schemeParam}.}
+    \item{\code{temperLadder}}{This is the temperature ladder needed for
+      the second stage preliminary run. One can either specify a
+      temperature ladder via \code{temperLadder} or specify
+      \code{temperLimits}, \code{ladderLen}, \code{scheme} and
+      \code{schemeParam}. For details on the later set of parameters,
+      see below. Note, \code{temperLadder} overrides
+      \code{temperLimits}, \code{ladderLen}, \code{scheme} and
+      \code{schemeParam}.}
     
-    \item{\code{temperLimits}}{\cr
-      \code{temperLimits = c(lowerLimit, upperLimit)} is a two-tuple
-      of positive numbers, where the \code{lowerLimit} is usually 1
-      and \code{upperLimit} is a number in [100, 1000]. If stochastic
-      optimization (via sampling) is the goal, then \code{lowerLimit} is
-      taken to be in [0, 1]. Often the \code{upperLimit} is the maximum
-      temperature as suggested by \code{\link{findMaxTemper}}.}
+    \item{\code{temperLimits}}{\code{temperLimits = c(lowerLimit,
+      upperLimit)} is a two-tuple of positive numbers, where the
+      \code{lowerLimit} is usually 1 and \code{upperLimit} is a number
+      in [100, 1000]. If stochastic optimization (via sampling) is the
+      goal, then \code{lowerLimit} is taken to be in [0, 1]. Often the
+      \code{upperLimit} is the maximum temperature as suggested by
+      \code{\link{findMaxTemper}}.}
 
-    \item{\code{ladderLen}, \code{scheme} and \code{schemeParam}}{\cr
-      These three parameters are required (along with
-      \code{temperLimits}) if \code{temperLadder} \emph{is not}
-      provided. We recommend taking \code{ladderLen} in [15, 30]. The
-      allowed choices for \code{scheme} and \code{schemeParam} are:}
+    \item{\code{ladderLen}, \code{scheme} and \code{schemeParam}}{These
+      three parameters are required (along with \code{temperLimits}) if
+      \code{temperLadder} \emph{is not} provided. We recommend taking
+      \code{ladderLen} in [15, 30]. The allowed choices for
+      \code{scheme} and \code{schemeParam} are:}
 
     \tabular{rl}{
       \code{scheme} \tab \code{schemeParam} \cr
@@ -153,16 +152,15 @@ placeTempers(nIters,
     }
 
     We recommended using \code{scheme = 'exponential'} and
-    \code{schemeParam} in [0.3, 0.5].
+    \code{schemeParam} in [1.5, 2].
     
-    \item{\code{guideMe}}{\cr
-      If \code{guideMe = TRUE}, then the function suggests different
-      modifications to alter the setting towards a re-run, in case there
-      are problems with the underlying MCMC run.}
+    \item{\code{guideMe}}{If \code{guideMe = TRUE}, then the function
+      suggests different modifications to alter the setting towards a
+      re-run, in case there are problems with the underlying MCMC run.}
 
-    \item{\code{levelsSaveSampFor}}{\cr
-      This is passed to \code{evolMonteCarlo} for the underlying MCMC
-      run.}
+    \item{\code{levelsSaveSampFor}}{This is passed to
+      \code{evolMonteCarlo} for the underlying MCMC run.}
+
     }
 }
 
@@ -203,6 +201,7 @@ placeTempers(nIters,
   \item{startingVals}{the \code{startingVals} argument.}
 
   \item{time}{the time taken by the run.}
+
 }
 
 \note{
@@ -229,6 +228,7 @@ placeTempers(nIters,
 
     \code{levelsSaveSampFor}
     \tab \code{temperLadderLen}.
+
   }
 }
 
@@ -244,57 +244,8 @@ placeTempers(nIters,
   \code{\link{evolMonteCarlo}}}
 
 \examples{
-## The V-shaped distribution
-VShapedFuncGenerator <-
-    function (seed = 13579)
-{
-    set.seed(seed)    
-    dd     <- 2
-    ARDisp <-
-        function (rho)
-        {
-            tmp <- rep(1, dd)
-            diag((1 - rho) * tmp) + rho * tmp \%*\% t(tmp)
-        }
-
-    nMixComps  <- 2
-    logWeights <- log(rep(1 / nMixComps, nMixComps))
-    meanMat    <- matrix(c(1, 1, 15, 1), nMixComps, byrow = TRUE)
-    dispParam  <- c(-0.95, 0.95)
-    dispArr    <- array(dim = c(2, 2, nMixComps))
-    for (ii in seq_len(nMixComps)) {
-        dispArr[ , , ii] <- ARDisp(dispParam[ii])
-    }
-    logTarDensFunc <-
-        function (draw, ...)
-        {
-            ld <- sapply(seq_len(nMixComps), FUN =
-                         function (ii)
-                     {
-                         dmvnorm(draw, meanMat[ii, ], dispArr[ , , ii], log = TRUE)
-                     })
-            ww <- logWeights + ld
-            mm <- max(ww)
-            mm + log(sum(exp(ww - mm)))
-        }
-    
-    MHProposalSD  <- c(1.0, 1.0)
-    MHPropNewFunc <-
-        function (temperature, block, currentDraw, ...)
-        {
-            proposalDraw        <- currentDraw
-            proposalDraw[block] <- rnorm(1, currentDraw[block],
-                                         sqrt(temperature) * MHProposalSD[block])
-            proposalDraw
-        }
-
-    list(logTarDensFunc = logTarDensFunc,
-         MHPropNewFunc  = MHPropNewFunc)
-}
-
-
 placeTempersObj <-
-    with(VShapedFuncGenerator( ),
+    with(VShapedFuncGenerator(-13579),
          placeTempers(nIters            = 10000,
                       acceptRatioLimits = c(0.5, 0.6),
                       ladderLenMax      = 50,

@@ -1,5 +1,38 @@
 
-### $Id: common.R,v 1.12 2008/01/11 02:31:12 goswami Exp $
+###  $Id: common.R,v 1.15 2008/02/04 17:01:35 goswami Exp $
+###  
+###  File:    common.R
+###  Package: EMC
+###  
+###  Copyright (C) 2006-present Gopi Goswami
+###
+###  This program is free software; you can redistribute it and/or modify
+###  it under the terms of the GNU General Public License as published by
+###  the Free Software Foundation; either version 2 of the License, or
+###  (at your option) any later version.
+###
+###  This program is distributed in the hope that it will be useful,
+###  but WITHOUT ANY WARRANTY; without even the implied warranty of
+###  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+###  GNU General Public License for more details.
+###
+###  For a copy of the GNU General Public License please write to the
+###  Free Software Foundation, Inc.
+###  59 Temple Place, Suite 330.
+###  Boston, MA  02111-1307 USA.
+###
+###  For bugs in the code please contact:
+###  <goswami@stat.harvard.edu>
+###
+###  SYNOPSIS
+###
+###
+###
+###  DESCRIPTION
+###
+###
+###
+
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ### Some utility functions 
@@ -17,14 +50,12 @@ fatal <-
     stop(stopMsg, call. = FALSE)
 }
 
-
 collectVarnames <-
     function (varnames, env = sys.frame(-1), simplify = FALSE, USE.NAMES = TRUE)
 {
     sapply(varnames, function (vv) get(vv, envir = env),
            simplify = simplify, USE.NAMES = USE.NAMES)
 }
-
 
 procAcceptRatios1 <-
     function (samplerObj)
@@ -34,7 +65,6 @@ procAcceptRatios1 <-
     aR[c('ratio', 'accepted', 'proposed')]
 }
 
-
 procAcceptRatios2 <-
     function (samplerObj)
 {
@@ -42,7 +72,6 @@ procAcceptRatios2 <-
     row.names(dAR) <- 'acceptRatios'
     dAR
 }
-
 
 procFinal1 <-
     function (res)
@@ -58,28 +87,16 @@ procFinal1 <-
     res$detailedAcceptRatios <- procAcceptRatios2(res)
     res
 }
-    
+   
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 ### Some helper functions for TOEMCMain
-
-.check.nIters <-
-    function (nIters)
-{
-    if (!is.numeric(nIters) ||
-        (nIters <= 0))
-        fatal('Please provide a positive value for nIters:', nIters)
-    
-    as.integer(nIters)
-}
-
-### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 .check.temperLadder <-
     function (temperLadder)
 {
-    msg <- paste('Please provide a valid temperLadder :: it should be a',
-                 'decreasing sequence of positive numbers:')
+    msg <- paste('Please provide a valid temperLadder :: it should be a ',
+                 'decreasing sequence of positive numbers. ',
+                 'The given object:', sep = '')
     if (!is.vector(temperLadder) ||
         (length(temperLadder) == 0) ||
         !all(temperLadder > 0))
@@ -101,21 +118,22 @@ procFinal1 <-
         return(startingVals)
 
     if (length(startingVals) == 0) {
-        msg <- paste('Please provide a vector of length same as',
-                     'the dimension of the sample space')
-        fatal(msg)
+        msg <- paste('Please provide a vector for startingVals of length ',
+                     'same as the dimension of the sample space. ',
+                     'The given object:', sep = '')
+        fatal(msg, startingVals)
     }
     
     matrix(rep(startingVals, nLevels), nLevels, byrow = TRUE)
 }
-
 
 .check.startingValsMat <-
     function (startingVals, nLevels)
 {
     msg <- paste('Please provide a valid matrix for startingVals :: ',
                  'it should be a matrix with nLevels = ', nLevels, ' rows, ',
-                 'where nLevels = length of the temperLadder', sep = '')
+                 'where nLevels = length of the temperLadder. ',
+                 'The given object:', sep = '')
 
     if (!is.matrix(startingVals))
         fatal(msg, startingVals)
@@ -125,7 +143,6 @@ procFinal1 <-
     
     apply(startingVals, c(1, 2), as.double)
 }
-
 
 .check.startingVals <-
     function (startingVals, nLevels)
@@ -137,64 +154,76 @@ procFinal1 <-
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 .check.func.do <-
-    function (func, argsReq, funcname = substitute(func), checkNames = TRUE)
+    function (func,
+              argsReq,
+              retObjMsg,
+              funcname   = substitute(func),
+              checkNames = TRUE)
 {
     msg <- paste('Please provide a valid R function for "', funcname,
-                 '" with argument(s): (', toString(argsReq), ').', sep = '')
+                 '" with argument(s):\n',
+                 '(', toString(argsReq), ')\n\n',
+                 'The function should return:\n',
+                 retObjMsg, '\n\n',
+                 'See the relevant help page for details.\n',
+                 sep = '')
 
-    if (!is.function(func))
-        fatal(msg, func)
+    if (!is.function(func)) {
+        msg <- paste(msg, 'The given object:\n', sep = '')
+        fatal(msg, func, formatMsg = FALSE)
+    }
 
     argsHave <- names(formals(func))
     if (checkNames) {
         if (length(argsMissing <- setdiff(argsReq, argsHave)) > 0) {
-            msg <- paste(msg, 'The following arguments are missing:')
-            fatal(msg, argsMissing)
+            msg <- paste(msg, 'The following arguments are missing:', sep = '')
+            fatal(msg, argsMissing, formatMsg = FALSE)
         }
         
         if (!('...' %in% argsReq) &&
             (length(argsExtra <- setdiff(argsHave, argsReq)) > 0)) {
-            msg <- paste(msg, 'The function has the following extra arguments:')
-            fatal(msg, argsExtra)
+            msg <- paste(msg, 'The function has the following extra arguments:',
+                         sep = '')
+            fatal(msg, argsExtra, formatMsg = FALSE)
         }
     }
     else {
         if (!('...' %in% argsReq) &&
             ((nHave <- length(argsHave)) != (nReq <- length(argsReq)))) {
-            msg <- paste(msg, 'The given function takes', nHave, 'arguments',
-                         'instead of', nReq)
-            fatal(msg)
+            msg <- paste(msg, 'The given function takes ', nHave, ' arguments ',
+                         'instead of ', nReq, sep = '')
+            fatal(msg, formatMsg = FALSE)
         }
     }
     
     as.function(func)
 }
 
-
 .check.logTarDensFunc <-
     function (logTarDensFunc)
 {
-    .check.func.do(logTarDensFunc, argsReq = c('draw', '...'))
+    argsReq   <- c('draw', '...')
+    retObjMsg <- 'a numeric value'        
+    .check.func.do(logTarDensFunc, argsReq = argsReq, retObjMsg = retObjMsg)
 }
-
 
 .check.MHPropNewFunc <-
     function (MHPropNewFunc)
 {
-    .check.func.do(MHPropNewFunc, 
-                   argsReq = c('temperature', 'block', 'currentDraw', '...'))
+    argsReq   <- c('temperature', 'block', 'currentDraw', '...')
+    retObjMsg <- 'a numeric vector'
+    .check.func.do(MHPropNewFunc, argsReq = argsReq, retObjMsg = retObjMsg)
 }
-
 
 .check.logMHPropDensFunc <-
     function (logMHPropDensFunc)
 {
     if (is.null(logMHPropDensFunc))
         return(NULL)
-    
-    .check.func.do(logMHPropDensFunc, 
-                   argsReq = c('temperature', 'block', 'currentDraw',
-                   'proposalDraw', '...'))
+
+    argsReq   <- c('temperature', 'block', 'currentDraw', 'proposalDraw', '...')
+    retObjMsg <- 'a numeric value'
+    .check.func.do(logMHPropDensFunc, argsReq = argsReq, retObjMsg = retObjMsg)
 }
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -205,18 +234,17 @@ procFinal1 <-
     if (!is.vector(MHRWMPropDisp))
         return(MHRWMPropDisp)
     
-    if ((lengthHave <- length(MHRWMPropDisp)) != sampDim) {
+    if (length(MHRWMPropDisp) != sampDim) {
         msg <- paste('Please provide a vector for MHRWMPropDisp :: ',
                      'it should be a vector of length:\n',
                      'sampDim  =  ', sampDim, ', where\n',
                      'sampDim = number of columns of the starting value matrix. ',
-                     'The given vector is of length:', sep = '')
-        fatal(msg, lengthHave, formatMsg = FALSE)
+                     'The given vector:', sep = '')
+        fatal(msg, MHRWMPropDisp, formatMsg = FALSE)
     }
     
     diag(MHRWMPropDisp)
 }
-
 
 .check.MHRWMPropDispMat <-
     function (MHRWMPropDisp, sampDim, nLevels, temperLadder)
@@ -241,7 +269,6 @@ procFinal1 <-
     arr
 }
 
-
 .check.MHRWMPropDispArr <-
     function (MHRWMPropDisp, sampDim, nLevels)
 {
@@ -263,7 +290,6 @@ procFinal1 <-
 
     apply(MHRWMPropDisp, c(1, 2, 3), as.double)
 }
-
 
 .check.MHRWMPropDisp <-
     function (MHRWMPropDisp, sampDim, nLevels, temperLadder, MHPropNewFunc)
@@ -303,7 +329,7 @@ procFinal1 <-
 
     if (!is.list(MHBlocks) ||
         (length(MHBlocks) == 0)) {
-        msg <- paste('Please provide a list for MHBlocks :: it should be a list ',
+        msg <- paste('Please provide a list for MHBlocks :: it should be a list',
                      'of blocks of dimensions to be sampled together.',
                      'The following was provided instead:')
         fatal(msg, MHBlocks)
@@ -322,7 +348,6 @@ procFinal1 <-
     lapply(MHBlocks, as.integer)
 }
 
-
 .check.MHBlockNTimes <-
     function (MHBlockNTimes, nMHBlocks)
 {
@@ -333,10 +358,10 @@ procFinal1 <-
         (length(MHBlockNTimes) != nMHBlocks) ||
         (any(MHBlockNTimes <= 0))) {
         msg <- paste('Please provide a vector for MHBlockNTimes :: it should ',
-                     'be of length nMHBlocks = ', nMHBlocks, ', where\n',
+                     'be of length nMHBlocks = ', nMHBlocks, ', where ',
                      'nMHBlocks = length of MHBlocks list. The following was ',
                      'provided instead:')
-        fatal(msg, MHBlockNTimes, formatMsg = FALSE)
+        fatal(msg, MHBlockNTimes)
     }
     
     as.integer(MHBlockNTimes)
@@ -353,10 +378,10 @@ procFinal1 <-
     if (!all(is.logical(isMHRWMVec)) ||
         (length(isMHRWMVec) != nMHBlocks)) {
         msg <- paste('Please provide a vector for isMHRWMVec :: it should ',
-                     'be of length nMHBlocks = ', nMHBlocks, ', where\n',
+                     'be of length nMHBlocks = ', nMHBlocks, ', where ',
                      'nMHBlocks = length of MHBlocks list. The following was ',
                      'provided instead:')
-        fatal(msg, isMHRWMVec, formatMsg = FALSE)
+        fatal(msg, isMHRWMVec)
     }
     
     as.logical(isMHRWMVec)
@@ -366,21 +391,24 @@ procFinal1 <-
 
 .get.implementedMovenames <-
     function ( )
-    c('MH', 'RC', 'SC', 'RE', 'BCE', 'BIRE', 'BSE','CE') 
-
+    c('MH', 'RC', 'SC',
+      'RE', 'BCE', 'BIRE', 'BSE', 'CE') 
 
 .get.specialMovenames <-
     function ( )
-    c('BCE', 'BIRE', 'BSE','CE') 
+    c('BCE', 'BIRE', 'BSE', 'CE') 
 
+.get.crossoverMovenames <-
+    function ( )
+    c('RC', 'SC')
 
 .get.implementedMovesList <-
     function (func, implementedMovenames = .get.implementedMovenames( ))
     sapply(implementedMovenames, function (cc) func(0), simplify = FALSE)
 
-
 .check.moveList.do <-
-    function (aList, listname = substitute(aList),
+    function (aList,
+              listname             = substitute(aList),
               implementedMovenames = .get.implementedMovenames( ))
 {
     msg <- paste('Please provide a list for', listname)
@@ -415,7 +443,6 @@ procFinal1 <-
     }
 }
 
-
 .check.moveList.fill <-
     function (aList, func)
 {
@@ -425,7 +452,6 @@ procFinal1 <-
 
     ll
 }    
-
 
 .check.moveProbsList <-
     function (moveProbsList, nLevels)
@@ -451,7 +477,6 @@ procFinal1 <-
 
     .check.moveList.fill(moveProbsList, as.double)
 }
-
 
 .check.moveNTimesList <-
     function (moveNTimesList, moveProbsList, nLevels)
@@ -482,10 +507,10 @@ procFinal1 <-
     nmntl <- names(moveNTimesList[moveNTimesList > 0])    
     if (length(forgot <- setdiff(nmpl, nmntl)) > 0) {
         warning('Some of the components (',  toString(forgot), ') of ',
-                'moveNTimesList were made 1 since the corresponding ',
+                'moveNTimesList were made positive since the corresponding ',
                 'components of moveProbsList were positive', call. = FALSE)
         for (nn in forgot)
-            ll[[nn]] <- as.integer(1)
+            ll[[nn]] <- defaults[[nn]]
     }
     
     for (nn in intersect(names(moveNTimesList), .get.specialMovenames( ))) {
@@ -493,11 +518,11 @@ procFinal1 <-
             msg <- paste('Please provide a valid moveNTimes for move ', nn,
                          ' in moveNTimesList :: it should have non-negative',
                          ' number <= ', nLevels - 2, ' since nLevels = ',
-                         nLevels, sep = '')
+                         nLevels, '. The given moveNTimes:', sep = '')
             fatal(msg, moveNTimesList[[nn]])
         }
     }
-    
+
     ll
 }
 
@@ -512,13 +537,13 @@ procFinal1 <-
     if (is.null(var))
         var <- default
     if (is.null(var) || (var < 0)) {
-        msg <- paste('Please provide a positive value for ', varname, ':', sep = '')
+        msg <- paste('Please provide a positive value for ', varname,
+                     '. The given object:', sep = '')
         fatal(msg, var)
     }
     
     var
 }           
-
 
 .check.SCRWMPropSD <-
     function (SCRWMPropSD, moveNTimesList)
@@ -528,7 +553,6 @@ procFinal1 <-
                                    default        = NULL,
                                    moveNTimesList = moveNTimesList))
 }
-
 
 .check.SCRWMNTimes <-
     function (SCRWMNTimes, moveNTimesList)
@@ -545,14 +569,12 @@ procFinal1 <-
     function ( )
     c('random', 'best', 'worst')
 
-
 .get.defaults.selectionCodes <-
     function ( )
 {
     list(RC = c('best', 'best'),
          SC = c('best'))
 }
-
 
 .check.mSCList.do <-
     function (moveSelectionCodesList, moveNTimesList, movename, nVals,
@@ -573,18 +595,17 @@ procFinal1 <-
     }
     
     if (length(vv) != nVals) {
-        msg <- paste(msg1, ' should be of length ', nVals, '; given vector:',
+        msg <- paste(msg1, ' should be of length ', nVals, ', given vector:',
                      sep = '')
         fatal(msg, vv)
     }
 
     if (length(invalid <- setdiff(tolower(vv), selectionCodes)) > 0) {
-        msg <- paste(msg1, ' has some invalid selection codes:',
-                     toString(invalid), '; allowed codes are:', sep = '')
+        msg <- paste(msg1, ' has some invalid selection codes: ',
+                     toString(invalid), ', allowed codes are:', sep = '')
         fatal(msg, selectionCodes)
     }
 }
-
 
 .check.mSCList <-
     function (moveSelectionCodesList, moveNTimesList)
@@ -594,17 +615,18 @@ procFinal1 <-
     if (is.null(moveSelectionCodesList))
         return(sapply(defaults, as.character, simplify = FALSE))
 
-    if (!is.list(moveSelectionCodesList))
-        fatal('Please provide a list for moveSelectionCodesList:', moveSelectionCodesList)
+    if (!is.list(moveSelectionCodesList)) {
+        msg <- paste('Please provide a list for moveSelectionCodesList,',
+                     'given object:')
+        fatal(msg, moveSelectionCodesList)
+    }
     
-    .check.mSCList.do(moveSelectionCodesList = moveSelectionCodesList,
-                      moveNTimesList         = moveNTimesList,
-                      movename               = 'RC',
-                      nVals                  = 2)
-    .check.mSCList.do(moveSelectionCodesList = moveSelectionCodesList,
-                      moveNTimesList         = moveNTimesList,
-                      movename               = 'SC',
-                      nVals                  = 1)
+    for (vv in names(defaults)) {
+        .check.mSCList.do(moveSelectionCodesList = moveSelectionCodesList,
+                          moveNTimesList         = moveNTimesList,
+                          movename               = vv,
+                          nVals                  = length(defaults[[vv]]))
+    }
     
     needComps  <- names(defaults)
     nmscl      <- names(moveSelectionCodesList)
@@ -628,7 +650,6 @@ procFinal1 <-
          BCE = temperColdest)
 }
 
-
 .check.mSTList.do <-
     function (moveSelectionTempersList, moveNTimesList, movename, nVals)
 {
@@ -647,7 +668,7 @@ procFinal1 <-
     }
     
     if (length(vv) != nVals) {
-        msg <- paste(msg1, ' should be of length ', nVals, '; given vector:',
+        msg <- paste(msg1, ' should be of length ', nVals, ', given vector:',
                      sep = '')
         fatal(msg, vv)
     }
@@ -658,7 +679,6 @@ procFinal1 <-
     }
 }
 
-
 .check.mSTList <-
     function (moveSelectionTempersList, moveNTimesList, temperColdest)
 {
@@ -667,22 +687,18 @@ procFinal1 <-
     if (is.null(moveSelectionTempersList))
         return(sapply(defaults, as.double, simplify = FALSE))
 
-    if (!is.list(moveSelectionTempersList))
-        fatal('Please provide a list for moveSelectionTempersList:',
-              moveSelectionTempersList)
+    if (!is.list(moveSelectionTempersList)) {
+        msg <- paste('Please provide a list for moveSelectionTempersList,',
+                     'given object:')
+        fatal(msg, moveSelectionTempersList)
+    }
 
-    .check.mSTList.do(moveSelectionTempersList = moveSelectionTempersList,
-                      moveNTimesList           = moveNTimesList,
-                      movename                 = 'RC',
-                      nVals                    = 2)
-    .check.mSTList.do(moveSelectionTempersList = moveSelectionTempersList,
-                      moveNTimesList           = moveNTimesList,
-                      movename                 = 'SC',
-                      nVals                    = 1)
-    .check.mSTList.do(moveSelectionTempersList = moveSelectionTempersList,
-                      moveNTimesList           = moveNTimesList,
-                      movename                 = 'BCE',
-                      nVals                    = 1)
+    for (vv in names(defaults)) {
+        .check.mSTList.do(moveSelectionTempersList = moveSelectionTempersList,
+                          moveNTimesList           = moveNTimesList,
+                          movename                 = vv,
+                          nVals                    = length(defaults[[vv]]))
+    }    
 
     needComps <- names(defaults)
     nmstl     <- names(moveSelectionTempersList)
@@ -709,53 +725,56 @@ procFinal1 <-
         !all((1 <= levelsSaveSampFor) &&
              (levelsSaveSampFor <= nLevels))) {
         msg <- paste('Please provide an integer vector for levelsSaveSampFor :: ',
-                     'it should be of length  <=  nLevels = ',
-                     nLevels, ', where\n',
-                     'nLevels = length of the temperLadder.', sep = '')
+                     'it should be of length  <=  nLevels (= ', nLevels, '), ',
+                     'where nLevels = length of the temperLadder.', sep = '')
         fatal(msg, levelsSaveSampFor)
     }
     
     as.integer(levelsSaveSampFor)    
 }
 
-
 .check.logical <-
     function (val, varname = substitute(val))
 {
     if (!is.logical(val)) {
-        msg <- paste('Please provide a logical value for ', varname, ':', sep = '') 
+        msg <- paste('Please provide a logical value for "', varname, '". ',
+                     'The given object:', sep = '') 
         fatal(msg, val)
     }
     
     as.logical(val)
 }
 
-
-.check.integer <-
-    function (val, varname = substitute(val))
+.check.numericWithLLim <-
+    function (val, llim, varname = substitute(val), retFunc = as.integer)
 {
-    if (!is.numeric(val)) {
-        msg <- paste('Please provide a integer value for ', varname, ':', sep = '') 
+    if (!is.numeric(val)) {        
+        msg <- paste('Please provide an integer value for "', varname, '". ',
+                     'The given object:', sep = '')
         fatal(msg, val)
     }
-    
-    as.integer(val)
-}
 
+    if (!is.na(llim) &&
+        (val < llim)) {
+        msg <- paste('Provided "', varname, '" is too low :: it should be ',
+                     'an integer >= ', llim, '. The given value:', sep = '')
+        fatal(msg, val)
+    }
+
+    retFunc(val)
+}
 
 .check.timeInSecs <-
     function (timeInSecs)
 {
-    if (!is.numeric(timeInSecs))
-        fatal('Please provide a numeric value for timeInSecs:', timeInSecs)
+    timeInSecs <- .check.numericWithLLim(timeInSecs, NA, retFunc = as.numeric)
 
     if (timeInSecs > 0)
         warning('Since timeInSecs: ', timeInSecs, ', which is positive, ',
-                'nIters is ignored', call. = FALSE)
+                'nIters will be ignored', call. = FALSE)
     
     as.double(timeInSecs)
 }
-
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -764,14 +783,18 @@ procFinal1 <-
 {
     if (!is.list(statsFuncList)) {
         msg <- paste('Please provide a list of functions of one argument',
-                     'each for statsFuncList; given object:')
+                     '(xx) each for statsFuncList, given object:')
         fatal(msg, statsFuncList)
     }
     
+    argsReq   <- 'xx'
+    retObjMsg <- 'a numeric value'
     for (ii in seq_along(statsFuncList))
         statsFuncList[[ii]] <-
-            .check.func.do(statsFuncList[[ii]], argsReq = 'xx',
-                           funcname = paste('statsFuncList[[', ii, ']]', sep = ''))
+            .check.func.do(statsFuncList[[ii]],
+                           argsReq   = argsReq,
+                           retObjMsg = retObjMsg,
+                           funcname  = paste('statsFuncList[[', ii, ']]', sep = ''))
 
     statsFuncList
 }
@@ -799,23 +822,24 @@ buildLadder <-
                             'tangent')
     scheme             <- tolower(scheme)
     scheme             <- agrep(scheme, implementedSchemes, value = TRUE)
-    if (length(scheme) == 0)
-        stop('Please provied a valid temperature builder scheme, ',
-             'implemented schemes are: [',
-             'linear ',
-             'log ',
-             'geometric ',
-             'mult-power ',
-             'add-power (needs a positive param) ',
-             'reciprocal ',
-             'exponential (needs a positive param) ',
-             'tangent (needs a positive param)]')
-    
+    if (length(scheme) != 1)
+        stop('Please provied a valid ladder builder scheme, ',
+             'implemented schemes are:\n',
+             paste('linear ',
+                   'log ',
+                   'geometric ',
+                   'mult-power ',
+                   'add-power   (needs a positive param) ',
+                   'reciprocal ',
+                   'exponential (needs a positive param) ',
+                   'tangent     (needs a positive param)',
+                   sep = '\n'))
+
     specialSchemes <- c('exponential', 'tangent')
     if ((llim < 1.0) &&
         (scheme %in% specialSchemes))
         stop('Please choose a different scheme for building the temperature ',
-             'ladder :: the lower temperature limit cannot be < 1 for schemes ',
+             'ladder ::\n the lower temperature limit cannot be < 1 for schemes ',
              'in [ ', toString(specialSchemes), ' ]')
     
     ladderLinear <- seq(ulim, llim, len = length)
@@ -866,7 +890,6 @@ buildLadder <-
     ladder
 }
 
-
 .get.temperLadder <-
     function (temperLadder,
               temperLimits,
@@ -883,46 +906,18 @@ buildLadder <-
         !all(temperLimits > 0) ||
         (temperLimits[1] == temperLimits[2])) {
         msg <- paste('Please provide either a non-null temperLadder or',
-                     'temperLimits with two distinct positive entries; ',
+                     'temperLimits with two distinct positive entries,',
                      'given limits:')
         fatal(msg, temperLimits)
     }
 
-    if (!is.numeric(ladderLen) ||
-        (ladderLen <= 0))
-        fatal('please provide a positive value for ladderLen:', ladderLen)
+    ladderLen <- .check.numericWithLLim(ladderLen, 1)
 
     as.double(buildLadder(limits = temperLimits,
                           length = ladderLen,
                           scheme = scheme,
                           param  = schemeParam,
                           plotit = FALSE))    
-}
-
-### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-.check.cutoffDStats <-
-    function (cutoffDStats)
-{
-    if (!is.numeric(cutoffDStats) ||
-        (cutoffDStats <= 0))
-        fatal('Please provide a positive value for cutoffDStats:', cutoffDStats)
-
-    as.double(cutoffDStats)
-}
-
-
-.check.integerWithLLim <-
-    function (val, llim, varname = substitute(val))
-{
-    if (!is.numeric(val) ||
-        (val < llim)) {
-        msg <- paste('Provided ', varname, ' is too low :: it should be ',
-                     'an integer >= ', llim, '; given value:', sep = '')
-        fatal(msg, val)
-    }
-
-    as.integer(val)
 }
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -952,7 +947,6 @@ buildLadder <-
     do.call(what = rbind, args = ll)
 }
 
-
 .get.detailedAcceptRatios.MH <-
     function (comp, roundBy)
 {
@@ -971,7 +965,6 @@ buildLadder <-
     list(MH = roundDF(arm, roundBy = roundBy))
 }
 
-
 .get.row.col <-
     function (index, nRows)
 {
@@ -985,7 +978,6 @@ buildLadder <-
     }
     c(rr, cc)
 }
-
 
 .get.min.max.mat <-
     function (mat)
@@ -1009,7 +1001,6 @@ buildLadder <-
          max    = xx[oo[nn]])    
 }
 
-
 .str1 <-
     function (ll)
 {
@@ -1019,7 +1010,6 @@ buildLadder <-
                     argmaxLevels = sprintf("%2d <--> %2d", argmax[1], argmax[2]),
                     max          = max))
 }
-
 
 .get.detailedAcceptRatios.various <-
     function (comp)
@@ -1034,7 +1024,6 @@ buildLadder <-
     list(BetweenAllLevels      = .str1(bal),
          TargetWithOtherLevels = .str1(twol))
 }
-
 
 roundDF <-
     function (adf, roundBy)
@@ -1068,7 +1057,6 @@ roundDF <-
     rownames(arm) <- rownames(comp)
     list(CE = roundDF(arm, roundBy = roundBy))
 }
-
 
 .get.detailedAcceptRatios <-
     function (acceptRatiosList, roundBy = 3)

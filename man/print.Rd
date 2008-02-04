@@ -1,5 +1,5 @@
 
-%%% $Id: print.Rd,v 1.4 2008/01/11 04:12:42 goswami Exp $
+%%% $Id: print.Rd,v 1.5 2008/02/03 04:18:53 goswami Exp $
 
 \name{print}
 
@@ -39,4 +39,4 @@
   \code{\link{evolMonteCarlo}}, \code{\link{findMaxTemper}},
   \code{\link{placeTempers}}}
 
-\keyword{methods}
+\keyword{print}

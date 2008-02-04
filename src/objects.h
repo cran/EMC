@@ -1,5 +1,5 @@
 /*
- *  $Id: objects.h,v 1.16 2008/01/11 02:31:16 goswami Exp $
+ *  $Id: objects.h,v 1.18 2008/02/03 04:18:53 goswami Exp $
  *  
  *  File:    objects.h
  *  Package: EMC
@@ -43,22 +43,21 @@
 /*
  * The forward declaration of all the typedefs
  */
+typedef struct TimeDetails TimeDetails;
 typedef struct SamplerMoveObject SamplerMoveObject;
 typedef struct SampleLevelContext SampleLevelContext;
 typedef struct ProposalCounter ProposalCounter;
 typedef struct ARContext ARContext;
+typedef struct ArgsList1 ArgsList1;
+typedef struct ArgsList2 ArgsList2;
+typedef struct ArgsList3 ArgsList3;
 typedef struct Sampler Sampler;
-typedef struct TimeDetails TimeDetails;
 
-typedef int (*SamplerMove) (Sampler *);
-typedef int (*SamplerUtil) (Sampler *, SEXP);
-typedef double (*LogTargetDensity) (Sampler *, SEXP);
-typedef double (*LogProposalDensity) (Sampler *, int, int, SEXP, SEXP);
-typedef int (*ProposalNew) (Sampler *, int, int, SEXP, SEXP);
-
-struct TimeDetails {
-        double usr, sys;
-};
+typedef int    (*SamplerMove) (Sampler *);
+typedef int    (*SamplerUtil) (Sampler *, SEXP);
+typedef double (*FuncPtr1) (Sampler *, SEXP);
+typedef SEXP   (*FuncPtr2) (Sampler *, int, int, SEXP);
+typedef double (*FuncPtr3) (Sampler *, int, int, SEXP, SEXP);
 
 typedef enum MoveType {
         MH   = 0,
@@ -81,6 +80,10 @@ typedef enum SelectionCode {
 #define N_SELECTION 2
 #define MAX_SAMPLER_MOVE_NAME 10
 
+struct TimeDetails {
+        double usr, sys;
+};
+
 struct SamplerMoveObject {
         char name[MAX_SAMPLER_MOVE_NAME];
         SamplerMove func;
@@ -102,6 +105,21 @@ struct ARContext {
         double min, max;
         char minLevelsLabel[MAX_WORD_LENGTH], maxLevelsLabel[MAX_WORD_LENGTH];
         char minLabel[MAX_WORD_LENGTH], maxLabel[MAX_WORD_LENGTH];
+};
+
+struct ArgsList1 {
+        int posDraw;
+        SEXP argsList;
+};
+
+struct ArgsList2 {
+        int posTemperature, posBlock, posCurrentDraw;
+        SEXP argsList;
+};
+
+struct ArgsList3 {
+        int posTemperature, posBlock, posCurrentDraw, posProposalDraw;
+        SEXP argsList;
 };
 
 struct Sampler {
@@ -142,9 +160,19 @@ struct Sampler {
         SamplerUtil samplerOneIter, registerThisDraw;
         
         int nProtected;
+        
         SEXP logTarDensFunc;
-        SEXP logMHPropDensFunc;
+        ArgsList1 *logTarDensArgsList;
+        FuncPtr1 logTarDens;
+
         SEXP MHPropNewFunc;
+        ArgsList2 *MHPropNewArgsList;
+        FuncPtr2 MHPropNew;
+
+        SEXP logMHPropDensFunc;
+        ArgsList3 *logMHPropDensArgsList;
+        FuncPtr3 logMHPropDens;
+        
         SEXP doCallFuncCall, doCallFuncEnv;
         SEXP procTimeFuncCall, procTimeFuncEnv;
         TimeDetails *timeDetails;
@@ -153,18 +181,11 @@ struct Sampler {
          */        
         SEXP SEXPCurrDraws, *SEXPCurrDrawsStore;
         SEXP SEXPPropDraws;
-
+        
         SEXP argDraw, argCurrentDraw, argProposalDraw;
         SEXP argTemperature, argBlock;
-        SEXP argsList, dotsList;
-
-        int posDraw, posCurrentDraw, posProposalDraw;
-        int posTemperature, posBlock;        
+        SEXP dotsList;
         
-        LogTargetDensity logTarDens;
-        LogProposalDensity logMHPropDens;
-        ProposalNew MHPropNew;
-
         /*
          * nLevelsSaveSampFor \times sampDim \times nItersActual 
          * NOTE: this might need reallocation
@@ -177,6 +198,9 @@ sampler_new (SEXP opts);
 
 extern SEXP
 sampler_run (Sampler *ss);
+
+extern int
+sampler_print (Sampler *ss);
 
 extern int
 sampler_move_RWM (Sampler *ss);

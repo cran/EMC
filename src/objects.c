@@ -1,5 +1,5 @@
 /*
- *  $Id: objects.c,v 1.24 2008/01/11 02:19:10 goswami Exp $
+ *  $Id: objects.c,v 1.26 2008/02/03 04:18:53 goswami Exp $
  *  
  *  File:    objects.c
  *  Package: EMC
@@ -57,6 +57,9 @@
 static SEXP
 getListElement (SEXP list, char *str);
 
+static int
+gather_time_details (Sampler *ss);
+
 static ProposalCounter ***
 PC_mat_new (int dim1, int dim2);
 
@@ -67,21 +70,24 @@ static SelectionCode
 selection_codes (const char *codeName);
 
 static int
-sampler_new_argsList (Sampler *ss);
+args_list1_init (ArgsList1 *al);
 
 static int
-sampler_print (Sampler *ss);
+args_list2_init (ArgsList2 *al);
+
+static int
+args_list3_init (ArgsList3 *al);
 
 static double
-log_target_density_func_user_Rfunc (Sampler *ss, SEXP argXX);
+log_target_density_func_user_Rfunc (Sampler *ss, SEXP draw);
+
+static SEXP
+MHProposal_new_func_user_Rfunc (Sampler *ss, int level, int block,
+                                SEXP currentDraw);
 
 static double
 log_MHProposal_density_func_user_Rfunc (Sampler *ss, int level, int block,
-                                        SEXP argXX, SEXP argYY);
-
-static int
-MHProposal_new_func_user_Rfunc (Sampler *ss, int level, int block,
-                                SEXP argXX, SEXP argYY);
+                                        SEXP currentDraw, SEXP proposalDraw);
 
 static int
 copy_draw (Sampler *ss, SEXP dest, SEXP src);
@@ -122,9 +128,6 @@ static int
 sampler_move_SC_with_many_levels (Sampler *ss);
 
 static int
-cyclic_shift_draws (Sampler *ss, int ladderLength, int selLength);
-
-static int
 register_this_draw_fixed_iter_with_fitness (Sampler *ss, SEXP SEXPDraws);
 
 static int
@@ -135,6 +138,9 @@ register_this_draw_fixed_time_with_fitness (Sampler *ss, SEXP SEXPDraws);
 
 static int
 register_this_draw_fixed_time (Sampler *ss, SEXP SEXPDraws);
+
+static int
+sampler_one_iter_MH (Sampler *ss);
 
 static int
 sampler_one_iter_with_one_level (Sampler *ss, SEXP notRequired);
@@ -172,6 +178,7 @@ make_accept_ratios_list_CE (Sampler *ss);
 static SEXP
 make_accept_ratios_list (Sampler *ss);
 
+
 /*
  * The following has been taken from the "Manual" section of R
  * website, it gets the list element named str, or returns NULL, if
@@ -189,13 +196,13 @@ getListElement (SEXP list, char *str)
                 }
         }
         if (found == 0) {
-                char *sep, *errMsg1, errMsg2[MAX_LINE_LENGTH];
+                char *errMsg1, errMsg2[MAX_LINE_LENGTH];
 
                 errMsg1 = (char *) R_alloc(MAX_LINE_LENGTH, sizeof(errMsg1));
                 for (ii = 0; ii < nn; ii++) {
                         errMsg1 = strcat(errMsg1, CHAR(STRING_ELT(names, ii)));
-                        sep = ((ii == (nn - 1)) ? "" : ", ");
-                        errMsg1 = strcat(errMsg1, sep);
+                        errMsg1 = strcat(errMsg1,
+                                         ((ii == (nn - 1)) ? "" : ", "));
                 }
                         
                 sprintf(errMsg2,
@@ -264,6 +271,82 @@ selection_codes (const char *codeName)
         return code;
 }
 
+
+static int
+args_list1_init (ArgsList1 *al)
+{
+        int nComps = 0, comp = 0, nProtected = 0, nProtectedCaller = 0;
+        SEXP names;
+
+        al->posDraw = nComps++;
+
+        PROTECT(al->argsList = allocVector(VECSXP, nComps)); ++nProtectedCaller;
+        PROTECT(names        = allocVector(STRSXP, nComps)); ++nProtected;
+
+        for (comp = 0; comp < nComps; ++comp)
+                SET_VECTOR_ELT(al->argsList, comp, R_NilValue);
+        comp = 0;
+        SET_STRING_ELT(names, comp, mkChar("draw")); ++comp;
+
+        setAttrib(al->argsList, R_NamesSymbol, names);
+        UNPROTECT(nProtected);
+        return nProtectedCaller;        
+}
+        
+
+static int
+args_list2_init (ArgsList2 *al)
+{
+        int nComps = 0, comp = 0, nProtected = 0, nProtectedCaller = 0;
+        SEXP names;
+
+        al->posTemperature = nComps++;
+        al->posBlock       = nComps++;
+        al->posCurrentDraw = nComps++;
+        
+        PROTECT(al->argsList = allocVector(VECSXP, nComps)); ++nProtectedCaller;
+        PROTECT(names        = allocVector(STRSXP, nComps)); ++nProtected;
+
+        for (comp = 0; comp < nComps; ++comp)
+                SET_VECTOR_ELT(al->argsList, comp, R_NilValue);
+        comp = 0;
+        SET_STRING_ELT(names, comp, mkChar("temperature")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("block")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("currentDraw")); ++comp;
+
+        setAttrib(al->argsList, R_NamesSymbol, names);
+        UNPROTECT(nProtected);
+        return nProtectedCaller;        
+}
+        
+
+static int
+args_list3_init (ArgsList3 *al)
+{
+        int nComps = 0, comp = 0, nProtected = 0, nProtectedCaller = 0;
+        SEXP names;
+
+        al->posTemperature  = nComps++;
+        al->posBlock        = nComps++;
+        al->posCurrentDraw  = nComps++;
+        al->posProposalDraw = nComps++;
+        
+        PROTECT(al->argsList = allocVector(VECSXP, nComps)); ++nProtectedCaller;
+        PROTECT(names        = allocVector(STRSXP, nComps)); ++nProtected;
+
+        for (comp = 0; comp < nComps; ++comp)
+                SET_VECTOR_ELT(al->argsList, comp, R_NilValue);
+        comp = 0;
+        SET_STRING_ELT(names, comp, mkChar("temperature")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("block")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("currentDraw")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("proposalDraw")); ++comp;
+
+        setAttrib(al->argsList, R_NamesSymbol, names);
+        UNPROTECT(nProtected);
+        return nProtectedCaller;        
+}
+        
 
 Sampler *
 sampler_new (SEXP opts)
@@ -392,10 +475,21 @@ sampler_new (SEXP opts)
         
         ss->nProtected = 0;
         /* The user provided functions */
-        ss->logTarDensFunc    = getListElement(opts, "logTarDensFunc");
-        ss->logMHPropDensFunc = getListElement(opts, "logMHPropDensFunc");
-        ss->MHPropNewFunc     = getListElement(opts, "MHPropNewFunc");
+        ss->logTarDensFunc     = getListElement(opts, "logTarDensFunc");
+        ss->logTarDensArgsList = (ArgsList1 *) R_alloc(1, sizeof(struct ArgsList1));
+        ss->nProtected        += args_list1_init(ss->logTarDensArgsList);
 
+        ss->MHPropNewFunc     = getListElement(opts, "MHPropNewFunc");
+        ss->MHPropNewArgsList = (ArgsList2 *) R_alloc(1, sizeof(struct ArgsList2));
+        ss->nProtected       += args_list2_init(ss->MHPropNewArgsList);
+
+        ss->logMHPropDensFunc     = getListElement(opts, "logMHPropDensFunc");
+        ss->logMHPropDensArgsList = (ArgsList3 *) R_alloc(1, sizeof(struct ArgsList3));
+        ss->nProtected           += args_list3_init(ss->logMHPropDensArgsList);
+
+        PROTECT(ss->argTemperature = allocVector(REALSXP, 1)); ++(ss->nProtected);
+        PROTECT(ss->argBlock       = allocVector(INTSXP, 1)); ++(ss->nProtected);
+        
         SEXPTmp = getListElement(opts, "doCallFunc");
         PROTECT(ss->doCallFuncCall = lang4(SEXPTmp, R_NilValue,
                                            R_NilValue, R_NilValue));
@@ -414,9 +508,9 @@ sampler_new (SEXP opts)
         PROTECT(ss->SEXPPropDraws = allocVector(VECSXP, ss->nLevels));
         ss->nProtected += 2;
         for (ii = 0; ii < ss->nLevels; ++ii) {
-                PROTECT(SEXPTmp = allocVector(REALSXP, ss->sampDim));
+                PROTECT(SEXPTmp = allocVector(REALSXP, ss->sampDim)); 
                 SET_VECTOR_ELT(ss->SEXPCurrDraws, ii, SEXPTmp);
-                PROTECT(SEXPTmp = allocVector(REALSXP, ss->sampDim));
+                PROTECT(SEXPTmp = allocVector(REALSXP, ss->sampDim)); 
                 SET_VECTOR_ELT(ss->SEXPPropDraws, ii, SEXPTmp);
                 UNPROTECT(2);
         }
@@ -434,7 +528,6 @@ sampler_new (SEXP opts)
                 PHONY(utils_SEXP_darray_print(SEXPCurr, ", "););
         }
 
-        sampler_new_argsList(ss);
         ss->dotsList = getListElement(opts, "dotsList");
 
         /* fixed iter case */
@@ -451,60 +544,7 @@ sampler_new (SEXP opts)
 }
 
 
-static int
-sampler_new_argsList (Sampler *ss)
-{
-        int nComps = 0, comp = 0, nProtected = 0;
-        SEXP names;
-
-        /*
-         * Note the following arguments won't ever be used directly,
-         * they will serve as placeholders for other R_alloc'ed
-         * objects, that's why they start out pointing to NULL, and
-         * stay so later:
-         * 
-         * argDraw
-         * argCurrentDraw
-         * argProposalDraw
-         */
-        ss->argDraw         = R_NilValue;
-        ss->posDraw         = nComps++;
-        ss->argCurrentDraw  = R_NilValue;
-        ss->posCurrentDraw  = nComps++;
-        ss->argProposalDraw = R_NilValue;
-        ss->posProposalDraw = nComps++;
-        ss->argTemperature  = R_NilValue;
-        ss->posTemperature  = nComps++;
-        ss->argBlock        = R_NilValue;
-        ss->posBlock        = nComps++;
-        
-        PROTECT(ss->argsList = allocVector(VECSXP, nComps)); ++(ss->nProtected);
-        PROTECT(names        = allocVector(STRSXP, nComps)); ++nProtected;
-
-        SET_VECTOR_ELT(ss->argsList, comp, ss->argDraw);
-        SET_STRING_ELT(names, comp, mkChar("draw")); ++comp;
-        
-        SET_VECTOR_ELT(ss->argsList, comp, ss->argCurrentDraw);
-        SET_STRING_ELT(names, comp, mkChar("currentDraw")); ++comp;
-        
-        SET_VECTOR_ELT(ss->argsList, comp, ss->argProposalDraw);
-        SET_STRING_ELT(names, comp, mkChar("proposalDraw")); ++comp;        
-
-        PROTECT(ss->argTemperature = allocVector(REALSXP, 1)); ++nProtected;
-        SET_VECTOR_ELT(ss->argsList, comp, ss->argTemperature);
-        SET_STRING_ELT(names, comp, mkChar("temperature")); ++comp;
-        
-        PROTECT(ss->argBlock       = allocVector(INTSXP, 1)); ++nProtected;
-        SET_VECTOR_ELT(ss->argsList, comp, ss->argBlock);
-        SET_STRING_ELT(names, comp, mkChar("block")); ++comp;
-
-        setAttrib(ss->argsList, R_NamesSymbol, names);
-        UNPROTECT(nProtected);
-        return 0;
-}
-
-
-static int
+int
 sampler_print (Sampler *ss)
 {
         PRINT_STUB_INT(ss->nIters);
@@ -556,57 +596,67 @@ sampler_print (Sampler *ss)
 
 
 static double
-log_target_density_func_user_Rfunc (Sampler *ss, SEXP argDraw)
+log_target_density_func_user_Rfunc (Sampler *ss, SEXP draw)
 {
-        SET_VECTOR_ELT(ss->argsList, ss->posDraw, argDraw);
+        ArgsList1 *al = ss->logTarDensArgsList;
+        SEXP SEXPTmp;
+        double res;
+        
+        SET_VECTOR_ELT(al->argsList, al->posDraw, draw);
         
         SETCADR(ss->doCallFuncCall, ss->logTarDensFunc);
-        SETCADDR(ss->doCallFuncCall, ss->argsList);
-        SETCADDDR(ss->doCallFuncCall, ss->dotsList);        
-        return REAL(eval(ss->doCallFuncCall, ss->doCallFuncEnv))[0];
+        SETCADDR(ss->doCallFuncCall, al->argsList);
+        SETCADDDR(ss->doCallFuncCall, ss->dotsList);
+        PROTECT(SEXPTmp = eval(ss->doCallFuncCall, ss->doCallFuncEnv));
+        res = REAL(SEXPTmp)[0];
+        UNPROTECT(1);
+        return res;
+}
+
+
+static SEXP
+MHProposal_new_func_user_Rfunc (Sampler *ss, int level, int block,
+                                SEXP currentDraw)
+{
+        ArgsList2 *al = ss->MHPropNewArgsList;
+
+        REAL(ss->argTemperature)[0] = ss->temperLadder[level];
+        INTEGER(ss->argBlock)[0]    = block + 1;
+
+        SET_VECTOR_ELT(al->argsList, al->posTemperature, ss->argTemperature);
+        SET_VECTOR_ELT(al->argsList, al->posBlock, ss->argBlock);
+        SET_VECTOR_ELT(al->argsList, al->posCurrentDraw, currentDraw);
+
+        SETCADR(ss->doCallFuncCall, ss->MHPropNewFunc);
+        SETCADDR(ss->doCallFuncCall, al->argsList);
+        SETCADDDR(ss->doCallFuncCall, ss->dotsList);
+        return eval(ss->doCallFuncCall, ss->doCallFuncEnv);
 }
 
 
 static double
 log_MHProposal_density_func_user_Rfunc (Sampler *ss, int level, int block,
-                                        SEXP argCurrentDraw,
-                                        SEXP argProposalDraw)
+                                        SEXP currentDraw, SEXP proposalDraw)
 {
+        ArgsList3 *al = ss->logMHPropDensArgsList;
+        SEXP SEXPTmp;
+        double res;
+        
         REAL(ss->argTemperature)[0] = ss->temperLadder[level];
         INTEGER(ss->argBlock)[0]    = block + 1;
 
-        SET_VECTOR_ELT(ss->argsList, ss->posCurrentDraw, argCurrentDraw);
-        SET_VECTOR_ELT(ss->argsList, ss->posProposalDraw, argProposalDraw);
+        SET_VECTOR_ELT(al->argsList, al->posTemperature, ss->argTemperature);
+        SET_VECTOR_ELT(al->argsList, al->posBlock, ss->argBlock);
+        SET_VECTOR_ELT(al->argsList, al->posCurrentDraw, currentDraw);
+        SET_VECTOR_ELT(al->argsList, al->posProposalDraw, proposalDraw);
 
         SETCADR(ss->doCallFuncCall, ss->logMHPropDensFunc);
-        SETCADDR(ss->doCallFuncCall, ss->argsList);
+        SETCADDR(ss->doCallFuncCall, al->argsList);
         SETCADDDR(ss->doCallFuncCall, ss->dotsList);
-        return REAL(eval(ss->doCallFuncCall, ss->doCallFuncEnv))[0];        
-}
-
-
-static int
-MHProposal_new_func_user_Rfunc (Sampler *ss, int level, int block,
-                                SEXP argCurrentDraw, SEXP argProposalDraw)
-{
-        int ii;
-        double *dest, *src;        
-
-        REAL(ss->argTemperature)[0] = ss->temperLadder[level];
-        INTEGER(ss->argBlock)[0]    = block + 1;
-
-        SET_VECTOR_ELT(ss->argsList, ss->posCurrentDraw, argCurrentDraw);
-
-        SETCADR(ss->doCallFuncCall, ss->MHPropNewFunc);
-        SETCADDR(ss->doCallFuncCall, ss->argsList);
-        SETCADDDR(ss->doCallFuncCall, ss->dotsList);
-
-        src  = REAL(PROTECT(eval(ss->doCallFuncCall, ss->doCallFuncEnv)));
-        dest = REAL(argProposalDraw);
-        for (ii = 0; ii < ss->sampDim; ++ii) 
-                dest[ii] = src[ii];
+        PROTECT(SEXPTmp = eval(ss->doCallFuncCall, ss->doCallFuncEnv));
+        res = REAL(SEXPTmp)[0];
         UNPROTECT(1);
-        return 0;
+        return res;
 }
 
 
@@ -622,6 +672,50 @@ copy_draw (Sampler *ss, SEXP dest, SEXP src)
 }
 
 
+/* int */
+/* sampler_move_RWM (Sampler *ss) */
+/* { */
+/*         int ll = ss->thisLevel, bb = ss->thisBlock; */
+/*         double logPropDens, logNumerators[1], logDenominators[1], alpha; */
+/*         ProposalCounter **ppc = ss->movePropCtrs[MH][ll]; */
+/*         SEXP curr, prop; */
+        
+/*         PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););       */
+/*         curr = VECTOR_ELT(ss->SEXPCurrDraws, ll); */
+/*         prop = VECTOR_ELT(ss->SEXPPropDraws, ll); */
+/*         /\* MH proposal step *\/ */
+/*         logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll]; */
+/*         (*(ss->MHPropNew))(ss, ll, bb, curr, prop); */
+/*         logPropDens = (*(ss->logTarDens))(ss, prop); */
+/*         logNumerators[0] = logPropDens / ss->temperLadder[ll]; */
+/*         alpha = exp(logNumerators[0] - logDenominators[0]); alpha = MIN(1.0, alpha); */
+/*         if (R_FINITE(alpha) == FALSE) { */
+/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
+/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
+/*                 Rprintf("The current draw: logDensity: %g\n", logDenominators[0]); */
+/*                 utils_SEXP_darray_print(curr, ", "); */
+/*                 Rprintf("The proposal draw: logDensity: %g\n", logNumerators[0]); */
+/*                 utils_SEXP_darray_print(prop, ", "); */
+/*                 error("alpha is non finite, inspect the above numbers\n"); */
+/*         } */
+/*         (ppc[bb])->proposed += 1;         */
+/*         if (ss->verboseLevel >= 100)  */
+/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
+/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
+        
+/*         /\* MH acceptance rejection step *\/ */
+/*         if (runif(0, 1) <= alpha) { */
+/*                 if (ss->verboseLevel >= 10)  */
+/*                         Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
+/*                                 "alpha: %5.4g [*** accepted]\n", */
+/*                                 ll, bb, ss->thisIter, alpha); */
+/*                 copy_draw(ss, curr, prop); */
+/*                 ss->logDensities[ll] = logPropDens; */
+/*                 (ppc[bb])->accepted += 1; */
+/*         } */
+/*         return 0;         */
+/* } */
+
 int
 sampler_move_RWM (Sampler *ss)
 {
@@ -632,10 +726,9 @@ sampler_move_RWM (Sampler *ss)
         
         PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););      
         curr = VECTOR_ELT(ss->SEXPCurrDraws, ll);
-        prop = VECTOR_ELT(ss->SEXPPropDraws, ll);
         /* MH proposal step */
         logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll];
-        (*(ss->MHPropNew))(ss, ll, bb, curr, prop);
+        PROTECT(prop = (*(ss->MHPropNew))(ss, ll, bb, curr));
         logPropDens = (*(ss->logTarDens))(ss, prop);
         logNumerators[0] = logPropDens / ss->temperLadder[ll];
         alpha = exp(logNumerators[0] - logDenominators[0]); alpha = MIN(1.0, alpha);
@@ -663,8 +756,62 @@ sampler_move_RWM (Sampler *ss)
                 ss->logDensities[ll] = logPropDens;
                 (ppc[bb])->accepted += 1;
         }
+        UNPROTECT(1);
         return 0;        
 }
+
+
+/* int */
+/* sampler_move_MH (Sampler *ss) */
+/* { */
+/*         int ii, ll = ss->thisLevel, bb = ss->thisBlock; */
+/*         double logPropDens, logNumerators[2], logDenominators[2]; */
+/*         double logAlpha, alpha; */
+/*         ProposalCounter **ppc = ss->movePropCtrs[MH][ll]; */
+/*         SEXP curr, prop; */
+
+/*         PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););       */
+/*         curr = VECTOR_ELT(ss->SEXPCurrDraws, ll); */
+/*         prop = VECTOR_ELT(ss->SEXPPropDraws, ll); */
+/*         /\* MH proposal step *\/ */
+/*         logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll]; */
+/*         (*(ss->MHPropNew))(ss, ll, bb, curr, prop); */
+/*         logPropDens = (*(ss->logTarDens))(ss, prop); */
+/*         logNumerators[0] = logPropDens / ss->temperLadder[ll]; */
+/*         logDenominators[1] = (*(ss->logMHPropDens))(ss, ll, bb, curr, prop); */
+/*         logNumerators[1] = (*(ss->logMHPropDens))(ss, ll, bb, prop, curr); */
+/*         logAlpha = 0.0; */
+/*         for (ii = 0; ii < 2; ++ii)  */
+/*                 logAlpha += logNumerators[ii] - logDenominators[ii]; */
+/*         alpha = exp(logAlpha); alpha = MIN(1.0, alpha); */
+
+/*         if (R_FINITE(alpha) == FALSE) { */
+/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
+/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
+/*                 Rprintf("The current draw: logDensity: %g\n", logDenominators[0]); */
+/*                 utils_SEXP_darray_print(curr, ", "); */
+/*                 Rprintf("The proposal draw: logDensity: %g\n", logNumerators[0]); */
+/*                 utils_SEXP_darray_print(prop, ", "); */
+/*                 error("alpha is non finite, inspect the above numbers\n"); */
+/*         } */
+/*         (ppc[bb])->proposed += 1;         */
+/*         if (ss->verboseLevel >= 100)  */
+/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
+/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
+        
+/*         /\* MH acceptance rejection step *\/ */
+/*         if (runif(0, 1) <= alpha) { */
+/*                 if (ss->verboseLevel >= 10)  */
+/*                         Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
+/*                                 "alpha: %5.4g [*** accepted]\n", */
+/*                                 ll, bb, ss->thisIter, alpha); */
+/*                 copy_draw(ss, curr, prop); */
+/*                 ss->logDensities[ll] = logPropDens; */
+/*                 (ppc[bb])->accepted += 1; */
+/*         } */
+/*         return 0;                                 */
+/* } */
+
 
 int
 sampler_move_MH (Sampler *ss)
@@ -677,10 +824,9 @@ sampler_move_MH (Sampler *ss)
 
         PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););      
         curr = VECTOR_ELT(ss->SEXPCurrDraws, ll);
-        prop = VECTOR_ELT(ss->SEXPPropDraws, ll);
         /* MH proposal step */
         logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll];
-        (*(ss->MHPropNew))(ss, ll, bb, curr, prop);
+        PROTECT(prop = (*(ss->MHPropNew))(ss, ll, bb, curr));
         logPropDens = (*(ss->logTarDens))(ss, prop);
         logNumerators[0] = logPropDens / ss->temperLadder[ll];
         logDenominators[1] = (*(ss->logMHPropDens))(ss, ll, bb, curr, prop);
@@ -714,6 +860,7 @@ sampler_move_MH (Sampler *ss)
                 ss->logDensities[ll] = logPropDens;
                 (ppc[bb])->accepted += 1;
         }
+        UNPROTECT(1);
         return 0;                                
 }
 
@@ -1837,7 +1984,7 @@ make_accept_ratios_list_CE (Sampler *ss)
                 
                 ll = ii + 3; ppc = ss->movePropCtrs[CE][ll - 1];
                 for (sl = 0; sl < (ll - 1); ++sl) {
-                        aR = 0;
+                        aR = R_NaReal;
                         if (ppc[sl]->proposed > 0) 
                                 aR = ppc[sl]->accepted / ppc[sl]->proposed;
 

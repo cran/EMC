@@ -1,5 +1,5 @@
 
-%%% $Id: randomWalkMetropolis.Rd,v 1.18 2008/01/11 04:12:42 goswami Exp $
+%%% $Id: randomWalkMetropolis.Rd,v 1.19 2008/02/04 17:01:39 goswami Exp $
 
 \name{randomWalkMetropolis}
 
@@ -59,33 +59,35 @@ randomWalkMetropolis(nIters,
 
   \item{\dots}{optional arguments to be passed to \code{logTarDensFunc}
     and \code{propNewFunc}.}
+  
 }
 
 \details{
   \describe{
-    \item{\code{propNewFunc}}{\cr
-      The \code{propNewFunc} is called multiple times by varying the
-      \code{block} argument over \code{1:length(MHBlocks)}, so this
-      function should know how to generate a proposal from the
-      \code{currentDraw} depending on which block was passed as the
-      argument. \emph{See the example section for sample code.}}
 
-    \item{\code{MHBlocks} and \code{MHBlockNTimes}}{\cr
-      Blocking is an important and useful tool in MCMC that helps
-      speed up sampling and hence mixing. Example: Let \code{sampDim =
-        6}. Let we want to sample dimensions 1, 2, 4 as one block,
-      dimensions 3 and 5 as another and treat dimension 6 as the third
-      block. Suppose we want to sample the three blocks mentioned above 1,
-      5 and 10 times in each iteration, respectively. Then we could set
-      \code{MHBlocks = list(c(1, 2, 4), c(3, 5), 6)} and
-      \code{MHBlockNTimes = c(1, 5, 10)}}
+    \item{\code{propNewFunc}}{The \code{propNewFunc} is called multiple
+      times by varying the \code{block} argument over
+      \code{1:length(MHBlocks)}, so this function should know how to
+      generate a proposal from the \code{currentDraw} depending on which
+      block was passed as the argument. \emph{See the example section
+      for sample code.}}
 
-    \item{\code{saveFitness}}{\cr
-      The term \emph{fitness} refers to the negative of the
-      \code{logTarDensFunc} values. By default, the fitness values are
-      not saved, but one can do so by setting \code{saveFitness =
-        TRUE}.}
-    }
+    \item{\code{MHBlocks} and \code{MHBlockNTimes}}{Blocking is an
+      important and useful tool in MCMC that helps speed up sampling and
+      hence mixing. Example: Let \code{sampDim = 6}. Let we want to
+      sample dimensions 1, 2, 4 as one block, dimensions 3 and 5 as
+      another and treat dimension 6 as the third block. Suppose we want
+      to sample the three blocks mentioned above 1, 5 and 10 times in
+      each iteration, respectively. Then we could set \code{MHBlocks =
+      list(c(1, 2, 4), c(3, 5), 6)} and \code{MHBlockNTimes = c(1, 5,
+      10)}}
+
+    \item{\code{saveFitness}}{The term \emph{fitness} refers to the
+      negative of the \code{logTarDensFunc} values. By default, the
+      fitness values are not saved, but one can do so by setting
+      \code{saveFitness = TRUE}.}
+    
+  }
 }
 
 \value{
@@ -107,6 +109,7 @@ randomWalkMetropolis(nIters,
   \item{startingVal}{the \code{startingVal} argument.}
   
   \item{time}{the time taken by the run.}
+  
 }
 
 \note{
@@ -121,6 +124,7 @@ randomWalkMetropolis(nIters,
     \code{MHBlockNTimes}
     \tab \code{rep(1, length(MHBlocks))}.
   }
+  
 }
 
 \author{Gopi Goswami \email{goswami@stat.harvard.edu}}
@@ -134,40 +138,8 @@ randomWalkMetropolis(nIters,
   \code{\link{parallelTempering}}, \code{\link{evolMonteCarlo}}}
 
 \examples{
-## The Cigar-shaped distribution with (symmetric) normal-proposal
-CigarShapedFuncGenerator1 <-
-    function (seed = 13579)
-{
-    set.seed(seed)    
-    dd     <- 2
-    ARDisp <-
-        function (rho)
-        {
-            tmp <- rep(1, dd)
-            diag((1 - rho) * tmp) + rho * tmp \%*\% t(tmp)
-        }
-
-    means          <- c(1, 1)
-    disp           <- ARDisp(-0.95)
-    logTarDensFunc <-
-        function (draw, ...)
-            dmvnorm(draw, means, disp, log = TRUE)
-
-    proposalSD  <- c(1, 2)
-    propNewFunc <-
-        function (block, currentDraw, ...)
-        {
-            proposalDraw        <- currentDraw
-            proposalDraw[block] <- rnorm(1, currentDraw[block], proposalSD[block])
-            proposalDraw
-        }            
-    
-    list(logTarDensFunc  = logTarDensFunc,
-         propNewFunc     = propNewFunc)
-}
-
 samplerObj <-
-    with(CigarShapedFuncGenerator1( ),
+    with(CigarShapedFuncGenerator1(-13579),
          randomWalkMetropolis(nIters         = 5000,
                               startingVal    = c(0, 0),
                               logTarDensFunc = logTarDensFunc,
