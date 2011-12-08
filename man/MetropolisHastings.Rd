@@ -1,5 +1,5 @@
 
-%%% $Id: MetropolisHastings.Rd,v 1.19 2008/02/04 17:01:38 goswami Exp $
+%%% $Id: MetropolisHastings.Rd,v 1.20 2008/07/06 03:09:12 goswami Exp $
 
 \name{MetropolisHastings}
 
@@ -11,6 +11,8 @@
   Given a target density function and an asymmetric proposal
   distribution, this function produces samples from the target using the
   Metropolis Hastings algorithm.
+
+  Below \code{sampDim} refers to the dimension of the sample space.
 }
 
 \usage{
@@ -21,14 +23,13 @@ MetropolisHastings(nIters,
                    logPropDensFunc,     
                    MHBlocks      = NULL,
                    MHBlockNTimes = NULL,
+                   nThin         = 1,
                    saveFitness   = FALSE, 
                    verboseLevel  = 0,
                    \dots)    
 }
 
 \arguments{
-  Below \code{sampDim} refers to the dimension of the sample space.
-
   \item{nIters}{\code{integer} \eqn{>} 0.}
   
   \item{startingVal}{\code{double} vector of length \code{sampDim}.}
@@ -56,6 +57,9 @@ MetropolisHastings(nIters,
     given by \code{MHBlocks} should be sampled in each iteration. It
     defaults to \code{rep(1, length(MHBlocks))}. \emph{See details below
       for an example.}}
+
+  \item{nThin}{\code{integer} \eqn{\ge}{>=} 1. Every \code{nThin} draw is
+    saved.}
 
   \item{saveFitness}{\code{logical} indicating whether fitness values
     should be saved. \emph{See details below.}}
@@ -98,12 +102,13 @@ MetropolisHastings(nIters,
 }
 
 \value{
-  This function returns a list with the following components:
+  Below \code{nSave} refers to \code{ceil(nIters / nThin)}. This
+  function returns a list with the following components:
 
-  \item{draws}{\code{matrix} of dimension \code{nIters} \eqn{\times}{x}
+  \item{draws}{\code{matrix} of dimension \code{nSave} \eqn{\times}{x}
       \code{sampDim}, if \code{saveFitness = FALSE}. If
       \code{saveFitness = TRUE}, then the returned matrix is of
-      dimension \code{nIters} \eqn{\times}{x} \code{(sampDim + 1)},
+      dimension \code{nSave} \eqn{\times}{x} \code{(sampDim + 1)},
       where the fitness values appear in its last column.}
 
   \item{acceptRatios}{\code{matrix} of the acceptance rates.}
@@ -113,6 +118,10 @@ MetropolisHastings(nIters,
 
   \item{nIters}{the \code{nIters} argument.}
 
+  \item{nThin}{the \code{nThin} argument.}
+
+  \item{nSave}{as defined above.}
+  
   \item{startingVal}{the \code{startingVal} argument.}
 
   \item{time}{the time taken by the run.}
@@ -145,6 +154,7 @@ MetropolisHastings(nIters,
   \code{\link{parallelTempering}}, \code{\link{evolMonteCarlo}}}
 
 \examples{
+\dontrun{
 samplerObj <-
     with(CigarShapedFuncGenerator2(-13579),
          MetropolisHastings(nIters          = 5000,
@@ -168,6 +178,7 @@ with(samplerObj,
           xlab = as.expression(substitute(x[xii], list(xii = 1))),
           ylab = as.expression(substitute(x[xii], list(xii = 2))))    
  })
+}
 }
 
 \keyword{methods}

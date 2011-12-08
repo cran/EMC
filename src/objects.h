@@ -1,5 +1,5 @@
 /*
- *  $Id: objects.h,v 1.18 2008/02/03 04:18:53 goswami Exp $
+ *  $Id: objects.h,v 1.20 2008/07/06 03:09:13 goswami Exp $
  *  
  *  File:    objects.h
  *  Package: EMC
@@ -50,14 +50,12 @@ typedef struct ProposalCounter ProposalCounter;
 typedef struct ARContext ARContext;
 typedef struct ArgsList1 ArgsList1;
 typedef struct ArgsList2 ArgsList2;
-typedef struct ArgsList3 ArgsList3;
 typedef struct Sampler Sampler;
 
 typedef int    (*SamplerMove) (Sampler *);
 typedef int    (*SamplerUtil) (Sampler *, SEXP);
 typedef double (*FuncPtr1) (Sampler *, SEXP);
-typedef SEXP   (*FuncPtr2) (Sampler *, int, int, SEXP);
-typedef double (*FuncPtr3) (Sampler *, int, int, SEXP, SEXP);
+typedef SEXP   (*FuncPtr2) (Sampler *, SEXP);
 
 typedef enum MoveType {
         MH   = 0,
@@ -113,12 +111,7 @@ struct ArgsList1 {
 };
 
 struct ArgsList2 {
-        int posTemperature, posBlock, posCurrentDraw;
-        SEXP argsList;
-};
-
-struct ArgsList3 {
-        int posTemperature, posBlock, posCurrentDraw, posProposalDraw;
+        int posTemperature, posBlock, posDraw, posLogDens, posLevel, posIter;
         SEXP argsList;
 };
 
@@ -155,7 +148,7 @@ struct Sampler {
          */
         ProposalCounter ***movePropCtrs[N_IMPLEMENTED_MOVES];
 
-        int nLevelsSaveSampFor, *levelsSaveSampFor;
+        int nLevelsSaveSampFor, *levelsSaveSampFor, nThin, nSave, saveIter;
         Rboolean saveFitness;
         SamplerUtil samplerOneIter, registerThisDraw;
         
@@ -165,13 +158,9 @@ struct Sampler {
         ArgsList1 *logTarDensArgsList;
         FuncPtr1 logTarDens;
 
-        SEXP MHPropNewFunc;
-        ArgsList2 *MHPropNewArgsList;
-        FuncPtr2 MHPropNew;
-
-        SEXP logMHPropDensFunc;
-        ArgsList3 *logMHPropDensArgsList;
-        FuncPtr3 logMHPropDens;
+        SEXP oneIterMHFunc;
+        ArgsList2 *oneIterMHArgsList;
+        FuncPtr2 oneIterMH;
         
         SEXP doCallFuncCall, doCallFuncEnv;
         SEXP procTimeFuncCall, procTimeFuncEnv;
@@ -183,7 +172,7 @@ struct Sampler {
         SEXP SEXPPropDraws;
         
         SEXP argDraw, argCurrentDraw, argProposalDraw;
-        SEXP argTemperature, argBlock;
+        SEXP argTemperature, argBlock, argLogDens, argLevel, argIter;
         SEXP dotsList;
         
         /*

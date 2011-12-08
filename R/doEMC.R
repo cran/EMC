@@ -1,5 +1,5 @@
 
-###  $Id: doEMC.R,v 1.33 2008/02/04 17:01:35 goswami Exp $
+###  $Id: doEMC.R,v 1.35 2008/07/06 03:09:12 goswami Exp $
 ###  
 ###  File:    doEMC.R
 ###  Package: EMC
@@ -55,6 +55,7 @@ TOEMCMain <-
               moveSelectionCodesList   = NULL,
               moveSelectionTempersList = NULL,
               levelsSaveSampFor        = NULL,
+              nThin                    = 1,
               saveFitness              = FALSE,
               saveAcceptRatiosList     = FALSE, 
               timeInSecs               = -1,
@@ -69,9 +70,13 @@ TOEMCMain <-
     startingVals <- .check.startingVals(startingVals, nLevels)
     sampDim      <- as.integer(ncol(startingVals))
     
-    logTarDensFunc       <- .check.logTarDensFunc(logTarDensFunc)
-    MHPropNewFunc        <- .check.MHPropNewFunc(MHPropNewFunc)
-    logMHPropDensFunc    <- .check.logMHPropDensFunc(logMHPropDensFunc)
+    logTarDensFunc    <- .check.logTarDensFunc(logTarDensFunc)
+    MHPropNewFunc     <- .check.MHPropNewFunc(MHPropNewFunc)
+    logMHPropDensFunc <- .check.logMHPropDensFunc(logMHPropDensFunc)
+    oneIterMHFunc     <- .oneIterMHFuncGen(lTDF   = logTarDensFunc,
+                                           MHPNF  = MHPropNewFunc,
+                                           lMHPDF = logMHPropDensFunc)
+    
     MHRWMPropDispArr     <- .check.MHRWMPropDisp(MHRWMPropDisp,
                                                  sampDim       = sampDim,
                                                  nLevels       = nLevels,
@@ -98,6 +103,7 @@ TOEMCMain <-
                                                temperColdest  = temperLadder[nLevels])
 
     levelsSaveSampFor <- .check.levelsSaveSamplesFor(levelsSaveSampFor, nLevels)
+    nThin             <- .check.numericWithLLim(nThin, 1)
     saveFitness       <- .check.logical(saveFitness)    
     timeInSecs        <- .check.timeInSecs(timeInSecs)      
     verboseLevel      <- .check.numericWithLLim(verboseLevel, NA)  
@@ -106,7 +112,15 @@ TOEMCMain <-
     doCallFunc        <- as.function(doCall)             
     doCallFuncEnv     <- new.env( )
     dotsList          <- list(...)
-    argsList          <- collectVarnames(ls( ))
+    nSave             <- nIters %/% nThin
+    if ((nIters %% nThin) != 0) {
+        ## Increasing the nSave to make sure we have enough space to
+        ## save all the iters
+        nSave <- nSave + 1
+        warning('nIters: ', nIters, ' is not divisible by nThin: ', nThin)
+    }
+    nSave    <- as.integer(nSave)
+    argsList <- collectVarnames(ls( ))
     ## E N D: Error checks
 
     if (argsList$verboseLevel >= 3) {
@@ -114,10 +128,12 @@ TOEMCMain <-
         print(argsList)
     }
     if (argsList$verboseLevel >= 1) cat('\nBEGIN: EMC\n')        
-    res <- .Call('TOEMCMainC', argsList)
+    res <- .Call('TOEMCMainC', argsList, PACKAGE = 'EMC')
     if (argsList$verboseLevel >= 1) cat('E N D: EMC\n')
 
     res$nIters               <- nIters
+    res$nThin                <- nThin
+    res$nSave                <- nSave
     res$levelsSaveSampFor    <- levelsSaveSampFor
     res$temperLadder         <- temperLadder
     res$startingVals         <- startingVals
@@ -142,6 +158,7 @@ randomWalkMetropolis <-
               propNewFunc,
               MHBlocks      = NULL,
               MHBlockNTimes = NULL,
+              nThin         = 1,
               saveFitness   = FALSE, 
               verboseLevel  = 0,
               ...)     
@@ -168,6 +185,7 @@ randomWalkMetropolis <-
                      MHBlockNTimes     = MHBlockNTimes,
                      moveProbsList     = list(MH = 1.0),
                      moveNTimesList    = list(MH = 1),
+                     nThin             = nThin,
                      saveFitness       = saveFitness,
                      verboseLevel      = verboseLevel,
                      ...)
@@ -186,6 +204,7 @@ MetropolisHastings <-
               logPropDensFunc,
               MHBlocks      = NULL,
               MHBlockNTimes = NULL,
+              nThin         = 1,
               saveFitness   = FALSE, 
               verboseLevel  = 0,
               ...)    
@@ -226,6 +245,7 @@ MetropolisHastings <-
                      MHBlockNTimes     = MHBlockNTimes,
                      moveProbsList     = list(MH = 1.0),
                      moveNTimesList    = list(MH = 1),
+                     nThin             = nThin,
                      saveFitness       = saveFitness,
                      verboseLevel      = verboseLevel,
                      ...)
@@ -248,6 +268,7 @@ parallelTempering <-
               moveProbsList     = NULL,
               moveNTimesList    = NULL,
               levelsSaveSampFor = NULL,
+              nThin             = 1,
               saveFitness       = FALSE, 
               verboseLevel      = 0,
               ...)          
@@ -277,6 +298,7 @@ parallelTempering <-
                      moveProbsList     = moveProbsList,
                      moveNTimesList    = moveNTimesList,
                      levelsSaveSampFor = levelsSaveSampFor,
+                     nThin             = nThin,
                      saveFitness       = saveFitness,
                      verboseLevel      = verboseLevel,
                      ...)
@@ -299,6 +321,7 @@ evolMonteCarlo <-
               SCRWMNTimes       = NULL, 
               SCRWMPropSD       = NULL, 
               levelsSaveSampFor = NULL,
+              nThin             = 1,
               saveFitness       = FALSE,
               verboseLevel      = 0,
               ...)    
@@ -323,6 +346,7 @@ evolMonteCarlo <-
                      SCRWMNTimes       = SCRWMNTimes,
                      SCRWMPropSD       = SCRWMPropSD,
                      levelsSaveSampFor = levelsSaveSampFor,
+                     nThin             = nThin,
                      saveFitness       = saveFitness,
                      verboseLevel      = verboseLevel,
                      ...)

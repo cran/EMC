@@ -17,8 +17,9 @@ export(randomWalkMetropolis,
        VShapedFuncGenerator,
        WShapedFuncGenerator,
        uniModeFuncGenerator,
-       twentyModeFuncGenerator)
+       twentyModeFuncGenerator,
+       threeDimNormalFuncGenerator)
 
-S3Method(print, EMC)
-S3Method(print, EMCMaxTemper)
-S3Method(print, EMCPlaceTempers)
+S3method(print, EMC)
+S3method(print, EMCMaxTemper)
+S3method(print, EMCPlaceTempers)

@@ -1,8 +1,8 @@
 
 
-###  $Id: funcGenerators.R,v 1.2 2008/02/04 17:01:35 goswami Exp $
+###  $Id: funcGenerators.R,v 1.3 2008/02/05 20:21:23 goswami Exp $
 ###  
-###  File:    ladder.R
+###  File:    funcGenerators.R
 ###  Package: EMC
 ###  
 ###  Copyright (C) 2006-present Gopi Goswami
@@ -276,4 +276,53 @@ twentyModeFuncGenerator <-
     
     list(logTarDensFunc = logTarDensFunc,
          MHPropNewFunc  = MHPropNewFunc)    
+}
+
+
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### The three dimensional Normal example
+
+threeDimNormalFuncGenerator <-
+    function (seed)
+{
+    set.seed(seed)
+    dd <- 3
+    mu <- rep(0, dd)
+    Sigma <- matrix(c(1,   0.9,   0,
+                      0.9,   1,   0,
+                      0,     0,   1), nrow = dd, ncol = dd)
+
+    logTarDensFunc <-
+        function (draw, ...)
+        {
+            dmvnorm(draw, mu, Sigma, log = TRUE)
+        }
+
+    proposalInfo  <-
+        list(list(pos       =
+                  c(1, 2),
+                  propSigma =
+                  matrix(c(4, 2,
+                           2, 4), nrow = 2, ncol = 2)),
+             
+             list(pos    = 3,
+                  propSD = 2))
+    propNewFunc <-
+        function (block, currentDraw, ...)
+        {
+            proposalDraw <- currentDraw
+            info         <- proposalInfo[[block]]
+            pos          <- info$pos
+            if (block == 1) {
+                proposalDraw[pos] <- mvrnorm(1, mu = currentDraw[pos],
+                                             Sigma = info$propSigma)
+            } else if (block == 2) {
+                proposalDraw[pos] <- rnorm(1, currentDraw[pos], info$propSD)
+            }
+            return(proposalDraw)
+        }
+    
+    list(logTarDensFunc = logTarDensFunc,
+         propNewFunc    = propNewFunc)
 }

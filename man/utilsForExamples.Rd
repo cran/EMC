@@ -9,6 +9,7 @@
 \alias{WShapedFuncGenerator}
 \alias{uniModeFuncGenerator}
 \alias{twentyModeFuncGenerator}
+\alias{threeDimNormalFuncGenerator}
 
 \title{The utility function(s) for examples}
 
@@ -24,6 +25,7 @@ VShapedFuncGenerator(seed)
 WShapedFuncGenerator(seed)
 uniModeFuncGenerator(seed)
 twentyModeFuncGenerator(seed)
+threeDimNormalFuncGenerator(seed)
 }
 
 \arguments{

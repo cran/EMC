@@ -1,5 +1,5 @@
 /*
- *  $Id: objects.c,v 1.26 2008/02/03 04:18:53 goswami Exp $
+ *  $Id: objects.c,v 1.28 2008/07/06 03:09:13 goswami Exp $
  *  
  *  File:    objects.c
  *  Package: EMC
@@ -75,19 +75,11 @@ args_list1_init (ArgsList1 *al);
 static int
 args_list2_init (ArgsList2 *al);
 
-static int
-args_list3_init (ArgsList3 *al);
-
 static double
 log_target_density_func_user_Rfunc (Sampler *ss, SEXP draw);
 
 static SEXP
-MHProposal_new_func_user_Rfunc (Sampler *ss, int level, int block,
-                                SEXP currentDraw);
-
-static double
-log_MHProposal_density_func_user_Rfunc (Sampler *ss, int level, int block,
-                                        SEXP currentDraw, SEXP proposalDraw);
+one_iter_MH_user_Rfunc (Sampler *ss, SEXP draw);
 
 static int
 copy_draw (Sampler *ss, SEXP dest, SEXP src);
@@ -302,7 +294,10 @@ args_list2_init (ArgsList2 *al)
 
         al->posTemperature = nComps++;
         al->posBlock       = nComps++;
-        al->posCurrentDraw = nComps++;
+        al->posDraw        = nComps++;
+        al->posLogDens     = nComps++;
+        al->posLevel       = nComps++;
+        al->posIter        = nComps++;
         
         PROTECT(al->argsList = allocVector(VECSXP, nComps)); ++nProtectedCaller;
         PROTECT(names        = allocVector(STRSXP, nComps)); ++nProtected;
@@ -312,35 +307,10 @@ args_list2_init (ArgsList2 *al)
         comp = 0;
         SET_STRING_ELT(names, comp, mkChar("temperature")); ++comp;
         SET_STRING_ELT(names, comp, mkChar("block")); ++comp;
-        SET_STRING_ELT(names, comp, mkChar("currentDraw")); ++comp;
-
-        setAttrib(al->argsList, R_NamesSymbol, names);
-        UNPROTECT(nProtected);
-        return nProtectedCaller;        
-}
-        
-
-static int
-args_list3_init (ArgsList3 *al)
-{
-        int nComps = 0, comp = 0, nProtected = 0, nProtectedCaller = 0;
-        SEXP names;
-
-        al->posTemperature  = nComps++;
-        al->posBlock        = nComps++;
-        al->posCurrentDraw  = nComps++;
-        al->posProposalDraw = nComps++;
-        
-        PROTECT(al->argsList = allocVector(VECSXP, nComps)); ++nProtectedCaller;
-        PROTECT(names        = allocVector(STRSXP, nComps)); ++nProtected;
-
-        for (comp = 0; comp < nComps; ++comp)
-                SET_VECTOR_ELT(al->argsList, comp, R_NilValue);
-        comp = 0;
-        SET_STRING_ELT(names, comp, mkChar("temperature")); ++comp;
-        SET_STRING_ELT(names, comp, mkChar("block")); ++comp;
-        SET_STRING_ELT(names, comp, mkChar("currentDraw")); ++comp;
-        SET_STRING_ELT(names, comp, mkChar("proposalDraw")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("draw")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("logDens")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("level")); ++comp;
+        SET_STRING_ELT(names, comp, mkChar("iter")); ++comp;
 
         setAttrib(al->argsList, R_NamesSymbol, names);
         UNPROTECT(nProtected);
@@ -357,27 +327,27 @@ sampler_new (SEXP opts)
         double *doublesTmp, *startingVals;        
         char *name;
         
-        ss = (Sampler *) R_alloc(1, sizeof(struct Sampler));
-        ss->nIters = INTEGER(getListElement(opts, "nIters"))[0];
+        ss             = (Sampler *) R_alloc(1, sizeof(struct Sampler));
+        ss->nIters     = INTEGER(getListElement(opts, "nIters"))[0];
         ss->timeInSecs = REAL(getListElement(opts, "timeInSecs"))[0];
-        if (ss->timeInSecs <= 0) ss->nItersActual = ss->nIters;
-        else                     ss->nItersActual = -1;
 
-        ss->verboseLevel = INTEGER(getListElement(opts, "verboseLevel"))[0];
-        ss->printEstTimeAt = 100; ss->printEstTimeNTimes = 10;
+        ss->verboseLevel         = INTEGER(getListElement(opts, "verboseLevel"))[0];
+        ss->printEstTimeAt       = 100;
+        ss->printEstTimeNTimes   = 10;
         /* FIXME: The setting for ss->printDotAt, is it all right? */
         ss->printInitialDotsWhen = ss->printEstTimeAt / 10;
-        ss->printDotAt = 0; ss->nDotsPerLine = 20;
-        ss->eachDotWorth = (int) ceil((ss->nIters - ss->printEstTimeAt + 1.0) / \
-                                      (ss->printEstTimeNTimes * ss->nDotsPerLine));
+        ss->printDotAt           = 0;
+        ss->nDotsPerLine         = 20;
+        ss->eachDotWorth         = (int) ceil((ss->nIters - ss->printEstTimeAt + 1.0) / \
+                                              (ss->printEstTimeNTimes * ss->nDotsPerLine));
 
-        SEXPTmp = getListElement(opts, "temperLadder");
-        ss->nLevels = length(SEXPTmp);
-        doublesTmp = REAL(SEXPTmp);
-        ss->temperLadder = (double *) R_alloc(ss->nLevels, sizeof(double));
+        SEXPTmp             = getListElement(opts, "temperLadder");
+        ss->nLevels         = length(SEXPTmp);
+        doublesTmp          = REAL(SEXPTmp);
+        ss->temperLadder    = (double *) R_alloc(ss->nLevels, sizeof(double));
         ss->invTemperLadder = (double *) R_alloc(ss->nLevels, sizeof(double));
         for (ii = 0; ii < ss->nLevels; ++ii) {
-                ss->temperLadder[ii] = doublesTmp[ii];
+                ss->temperLadder[ii]    = doublesTmp[ii];
                 ss->invTemperLadder[ii] = 1.0 / doublesTmp[ii];
         }
 
@@ -391,15 +361,15 @@ sampler_new (SEXP opts)
 
         ss->scratch_ARC = (ARContext *) R_alloc(1, sizeof(struct ARContext));
         
-        SEXPTmp = getListElement(opts, "startingVals");
+        SEXPTmp      = getListElement(opts, "startingVals");
         startingVals = REAL(SEXPTmp);        
-        ss->sampDim = ncols(SEXPTmp);
+        ss->sampDim  = ncols(SEXPTmp);
 
-        SEXPTmp = getListElement(opts, "MHBlocks");
-        ss->MHNBlocks = length(SEXPTmp);
-        SEXPTmp = getListElement(opts, "MHBlockNTimes");
+        SEXPTmp           = getListElement(opts, "MHBlocks");
+        ss->MHNBlocks     = length(SEXPTmp);
+        SEXPTmp           = getListElement(opts, "MHBlockNTimes");
         ss->MHBlockNTimes = (int *) R_alloc(ss->MHNBlocks, sizeof(int));
-        intsTmp = INTEGER(SEXPTmp);
+        intsTmp           = INTEGER(SEXPTmp);
         for (ii = 0; ii < ss->MHNBlocks; ++ii)
                 ss->MHBlockNTimes[ii] = intsTmp[ii];
 
@@ -471,6 +441,8 @@ sampler_new (SEXP opts)
         ss->levelsSaveSampFor = (int *) R_alloc(ss->nLevelsSaveSampFor, sizeof(int));
         for (ii = 0; ii < ss->nLevelsSaveSampFor; ++ii)
                 ss->levelsSaveSampFor[ii] = intsTmp[ii] - 1;
+        ss->nThin       = INTEGER(getListElement(opts, "nThin"))[0];
+        ss->nSave       = INTEGER(getListElement(opts, "nSave"))[0];
         ss->saveFitness = LOGICAL(getListElement(opts, "saveFitness"))[0];
         
         ss->nProtected = 0;
@@ -479,27 +451,26 @@ sampler_new (SEXP opts)
         ss->logTarDensArgsList = (ArgsList1 *) R_alloc(1, sizeof(struct ArgsList1));
         ss->nProtected        += args_list1_init(ss->logTarDensArgsList);
 
-        ss->MHPropNewFunc     = getListElement(opts, "MHPropNewFunc");
-        ss->MHPropNewArgsList = (ArgsList2 *) R_alloc(1, sizeof(struct ArgsList2));
-        ss->nProtected       += args_list2_init(ss->MHPropNewArgsList);
-
-        ss->logMHPropDensFunc     = getListElement(opts, "logMHPropDensFunc");
-        ss->logMHPropDensArgsList = (ArgsList3 *) R_alloc(1, sizeof(struct ArgsList3));
-        ss->nProtected           += args_list3_init(ss->logMHPropDensArgsList);
+        ss->oneIterMHFunc     = getListElement(opts, "oneIterMHFunc");
+        ss->oneIterMHArgsList = (ArgsList2 *) R_alloc(1, sizeof(struct ArgsList2));
+        ss->nProtected       += args_list2_init(ss->oneIterMHArgsList);
 
         PROTECT(ss->argTemperature = allocVector(REALSXP, 1)); ++(ss->nProtected);
         PROTECT(ss->argBlock       = allocVector(INTSXP, 1)); ++(ss->nProtected);
+        PROTECT(ss->argLogDens     = allocVector(REALSXP, 1)); ++(ss->nProtected);
+        PROTECT(ss->argLevel       = allocVector(INTSXP, 1)); ++(ss->nProtected);
+        PROTECT(ss->argIter        = allocVector(INTSXP, 1)); ++(ss->nProtected);
         
-        SEXPTmp = getListElement(opts, "doCallFunc");
+        SEXPTmp                    = getListElement(opts, "doCallFunc");
         PROTECT(ss->doCallFuncCall = lang4(SEXPTmp, R_NilValue,
                                            R_NilValue, R_NilValue));
         ++(ss->nProtected);
-        ss->doCallFuncEnv = getListElement(opts, "doCallFuncEnv");
+        ss->doCallFuncEnv          = getListElement(opts, "doCallFuncEnv");
         
-        SEXPTmp = getListElement(opts, "procTimeFunc");
+        SEXPTmp                      = getListElement(opts, "procTimeFunc");
         PROTECT(ss->procTimeFuncCall = lang1(SEXPTmp));
         ++(ss->nProtected);
-        ss->procTimeFuncEnv = getListElement(opts, "procTimeFuncEnv");
+        ss->procTimeFuncEnv          = getListElement(opts, "procTimeFuncEnv");
 
         ss->timeDetails = (TimeDetails *) R_alloc(1, sizeof(struct TimeDetails));
 
@@ -516,14 +487,13 @@ sampler_new (SEXP opts)
         }
 
         /* filling the starting values in */
-        count = 0;
         for (ii = 0; ii < ss->nLevels; ++ii) {
                 SEXPCurr = VECTOR_ELT(ss->SEXPCurrDraws, ii);
                 SEXPProp = VECTOR_ELT(ss->SEXPPropDraws, ii);
                 for (jj = 0; jj < ss->sampDim; ++jj) {
+                        count              = jj * ss->nLevels + ii;
                         REAL(SEXPCurr)[jj] = startingVals[count];
                         REAL(SEXPProp)[jj] = 0.0;
-                        ++count;
                 }                
                 PHONY(utils_SEXP_darray_print(SEXPCurr, ", "););
         }
@@ -532,6 +502,9 @@ sampler_new (SEXP opts)
 
         /* fixed iter case */
         if (ss->timeInSecs <= 0) { ss->draws = NULL; return ss; }
+
+        if (ss->timeInSecs <= 0) ss->nItersActual = ss->nSave;
+        else                     ss->nItersActual = -1;
         
         /* fixed time case */
         ss->draws = (double ***) R_alloc(ss->nLevelsSaveSampFor, sizeof(double **));
@@ -615,48 +588,28 @@ log_target_density_func_user_Rfunc (Sampler *ss, SEXP draw)
 
 
 static SEXP
-MHProposal_new_func_user_Rfunc (Sampler *ss, int level, int block,
-                                SEXP currentDraw)
+one_iter_MH_user_Rfunc (Sampler *ss, SEXP draw)
 {
-        ArgsList2 *al = ss->MHPropNewArgsList;
-
-        REAL(ss->argTemperature)[0] = ss->temperLadder[level];
-        INTEGER(ss->argBlock)[0]    = block + 1;
-
+        ArgsList2 *al = ss->oneIterMHArgsList;
+        int ll = ss->thisLevel;
+        
+        REAL(ss->argTemperature)[0] = ss->temperLadder[ll];
+        INTEGER(ss->argBlock)[0]    = ss->thisBlock + 1;
+        REAL(ss->argLogDens)[0]     = ss->logDensities[ll];
+        INTEGER(ss->argLevel)[0]    = ll + 1;
+        INTEGER(ss->argIter)[0]     = ss->thisIter + 1;
+        
         SET_VECTOR_ELT(al->argsList, al->posTemperature, ss->argTemperature);
         SET_VECTOR_ELT(al->argsList, al->posBlock, ss->argBlock);
-        SET_VECTOR_ELT(al->argsList, al->posCurrentDraw, currentDraw);
+        SET_VECTOR_ELT(al->argsList, al->posDraw, draw);
+        SET_VECTOR_ELT(al->argsList, al->posLogDens, ss->argLogDens);
+        SET_VECTOR_ELT(al->argsList, al->posLevel, ss->argLevel);
+        SET_VECTOR_ELT(al->argsList, al->posIter, ss->argIter);
 
-        SETCADR(ss->doCallFuncCall, ss->MHPropNewFunc);
+        SETCADR(ss->doCallFuncCall, ss->oneIterMHFunc);
         SETCADDR(ss->doCallFuncCall, al->argsList);
         SETCADDDR(ss->doCallFuncCall, ss->dotsList);
         return eval(ss->doCallFuncCall, ss->doCallFuncEnv);
-}
-
-
-static double
-log_MHProposal_density_func_user_Rfunc (Sampler *ss, int level, int block,
-                                        SEXP currentDraw, SEXP proposalDraw)
-{
-        ArgsList3 *al = ss->logMHPropDensArgsList;
-        SEXP SEXPTmp;
-        double res;
-        
-        REAL(ss->argTemperature)[0] = ss->temperLadder[level];
-        INTEGER(ss->argBlock)[0]    = block + 1;
-
-        SET_VECTOR_ELT(al->argsList, al->posTemperature, ss->argTemperature);
-        SET_VECTOR_ELT(al->argsList, al->posBlock, ss->argBlock);
-        SET_VECTOR_ELT(al->argsList, al->posCurrentDraw, currentDraw);
-        SET_VECTOR_ELT(al->argsList, al->posProposalDraw, proposalDraw);
-
-        SETCADR(ss->doCallFuncCall, ss->logMHPropDensFunc);
-        SETCADDR(ss->doCallFuncCall, al->argsList);
-        SETCADDDR(ss->doCallFuncCall, ss->dotsList);
-        PROTECT(SEXPTmp = eval(ss->doCallFuncCall, ss->doCallFuncEnv));
-        res = REAL(SEXPTmp)[0];
-        UNPROTECT(1);
-        return res;
 }
 
 
@@ -672,76 +625,19 @@ copy_draw (Sampler *ss, SEXP dest, SEXP src)
 }
 
 
-/* int */
-/* sampler_move_RWM (Sampler *ss) */
-/* { */
-/*         int ll = ss->thisLevel, bb = ss->thisBlock; */
-/*         double logPropDens, logNumerators[1], logDenominators[1], alpha; */
-/*         ProposalCounter **ppc = ss->movePropCtrs[MH][ll]; */
-/*         SEXP curr, prop; */
-        
-/*         PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););       */
-/*         curr = VECTOR_ELT(ss->SEXPCurrDraws, ll); */
-/*         prop = VECTOR_ELT(ss->SEXPPropDraws, ll); */
-/*         /\* MH proposal step *\/ */
-/*         logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll]; */
-/*         (*(ss->MHPropNew))(ss, ll, bb, curr, prop); */
-/*         logPropDens = (*(ss->logTarDens))(ss, prop); */
-/*         logNumerators[0] = logPropDens / ss->temperLadder[ll]; */
-/*         alpha = exp(logNumerators[0] - logDenominators[0]); alpha = MIN(1.0, alpha); */
-/*         if (R_FINITE(alpha) == FALSE) { */
-/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
-/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
-/*                 Rprintf("The current draw: logDensity: %g\n", logDenominators[0]); */
-/*                 utils_SEXP_darray_print(curr, ", "); */
-/*                 Rprintf("The proposal draw: logDensity: %g\n", logNumerators[0]); */
-/*                 utils_SEXP_darray_print(prop, ", "); */
-/*                 error("alpha is non finite, inspect the above numbers\n"); */
-/*         } */
-/*         (ppc[bb])->proposed += 1;         */
-/*         if (ss->verboseLevel >= 100)  */
-/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
-/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
-        
-/*         /\* MH acceptance rejection step *\/ */
-/*         if (runif(0, 1) <= alpha) { */
-/*                 if (ss->verboseLevel >= 10)  */
-/*                         Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
-/*                                 "alpha: %5.4g [*** accepted]\n", */
-/*                                 ll, bb, ss->thisIter, alpha); */
-/*                 copy_draw(ss, curr, prop); */
-/*                 ss->logDensities[ll] = logPropDens; */
-/*                 (ppc[bb])->accepted += 1; */
-/*         } */
-/*         return 0;         */
-/* } */
-
 int
-sampler_move_RWM (Sampler *ss)
+sampler_move_MH (Sampler *ss)
 {
         int ll = ss->thisLevel, bb = ss->thisBlock;
-        double logPropDens, logNumerators[1], logDenominators[1], alpha;
+        double logPropDens, alpha;
         ProposalCounter **ppc = ss->movePropCtrs[MH][ll];
-        SEXP curr, prop;
-        
+        SEXP curr, prop, SEXPTmp;
+
         PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););      
         curr = VECTOR_ELT(ss->SEXPCurrDraws, ll);
-        /* MH proposal step */
-        logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll];
-        PROTECT(prop = (*(ss->MHPropNew))(ss, ll, bb, curr));
-        logPropDens = (*(ss->logTarDens))(ss, prop);
-        logNumerators[0] = logPropDens / ss->temperLadder[ll];
-        alpha = exp(logNumerators[0] - logDenominators[0]); alpha = MIN(1.0, alpha);
-        if (R_FINITE(alpha) == FALSE) {
-                Rprintf("MH: level: %d | block: %d | iter: %d | " \
-                        "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha);
-                Rprintf("The current draw: logDensity: %g\n", logDenominators[0]);
-                utils_SEXP_darray_print(curr, ", ");
-                Rprintf("The proposal draw: logDensity: %g\n", logNumerators[0]);
-                utils_SEXP_darray_print(prop, ", ");
-                error("alpha is non finite, inspect the above numbers\n");
-        }
-        (ppc[bb])->proposed += 1;        
+        PROTECT(SEXPTmp = ss->oneIterMH(ss, curr));
+        alpha = REAL(getListElement(SEXPTmp, "alpha"))[0];
+        (ppc[bb])->proposed += 1;
         if (ss->verboseLevel >= 100) 
                 Rprintf("MH: level: %d | block: %d | iter: %d | " \
                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha);
@@ -752,116 +648,14 @@ sampler_move_RWM (Sampler *ss)
                         Rprintf("MH: level: %d | block: %d | iter: %d | " \
                                 "alpha: %5.4g [*** accepted]\n",
                                 ll, bb, ss->thisIter, alpha);
+                prop        = getListElement(SEXPTmp, "prop");
+                logPropDens = REAL(getListElement(SEXPTmp, "logPropDens"))[0];
                 copy_draw(ss, curr, prop);
                 ss->logDensities[ll] = logPropDens;
                 (ppc[bb])->accepted += 1;
         }
         UNPROTECT(1);
         return 0;        
-}
-
-
-/* int */
-/* sampler_move_MH (Sampler *ss) */
-/* { */
-/*         int ii, ll = ss->thisLevel, bb = ss->thisBlock; */
-/*         double logPropDens, logNumerators[2], logDenominators[2]; */
-/*         double logAlpha, alpha; */
-/*         ProposalCounter **ppc = ss->movePropCtrs[MH][ll]; */
-/*         SEXP curr, prop; */
-
-/*         PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););       */
-/*         curr = VECTOR_ELT(ss->SEXPCurrDraws, ll); */
-/*         prop = VECTOR_ELT(ss->SEXPPropDraws, ll); */
-/*         /\* MH proposal step *\/ */
-/*         logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll]; */
-/*         (*(ss->MHPropNew))(ss, ll, bb, curr, prop); */
-/*         logPropDens = (*(ss->logTarDens))(ss, prop); */
-/*         logNumerators[0] = logPropDens / ss->temperLadder[ll]; */
-/*         logDenominators[1] = (*(ss->logMHPropDens))(ss, ll, bb, curr, prop); */
-/*         logNumerators[1] = (*(ss->logMHPropDens))(ss, ll, bb, prop, curr); */
-/*         logAlpha = 0.0; */
-/*         for (ii = 0; ii < 2; ++ii)  */
-/*                 logAlpha += logNumerators[ii] - logDenominators[ii]; */
-/*         alpha = exp(logAlpha); alpha = MIN(1.0, alpha); */
-
-/*         if (R_FINITE(alpha) == FALSE) { */
-/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
-/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
-/*                 Rprintf("The current draw: logDensity: %g\n", logDenominators[0]); */
-/*                 utils_SEXP_darray_print(curr, ", "); */
-/*                 Rprintf("The proposal draw: logDensity: %g\n", logNumerators[0]); */
-/*                 utils_SEXP_darray_print(prop, ", "); */
-/*                 error("alpha is non finite, inspect the above numbers\n"); */
-/*         } */
-/*         (ppc[bb])->proposed += 1;         */
-/*         if (ss->verboseLevel >= 100)  */
-/*                 Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
-/*                         "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha); */
-        
-/*         /\* MH acceptance rejection step *\/ */
-/*         if (runif(0, 1) <= alpha) { */
-/*                 if (ss->verboseLevel >= 10)  */
-/*                         Rprintf("MH: level: %d | block: %d | iter: %d | " \ */
-/*                                 "alpha: %5.4g [*** accepted]\n", */
-/*                                 ll, bb, ss->thisIter, alpha); */
-/*                 copy_draw(ss, curr, prop); */
-/*                 ss->logDensities[ll] = logPropDens; */
-/*                 (ppc[bb])->accepted += 1; */
-/*         } */
-/*         return 0;                                 */
-/* } */
-
-
-int
-sampler_move_MH (Sampler *ss)
-{
-        int ii, ll = ss->thisLevel, bb = ss->thisBlock;
-        double logPropDens, logNumerators[2], logDenominators[2];
-        double logAlpha, alpha;
-        ProposalCounter **ppc = ss->movePropCtrs[MH][ll];
-        SEXP curr, prop;
-
-        PHONY(PRINT_STUB_INT(ll); PRINT_STUB_INT(bb););      
-        curr = VECTOR_ELT(ss->SEXPCurrDraws, ll);
-        /* MH proposal step */
-        logDenominators[0] = ss->logDensities[ll] / ss->temperLadder[ll];
-        PROTECT(prop = (*(ss->MHPropNew))(ss, ll, bb, curr));
-        logPropDens = (*(ss->logTarDens))(ss, prop);
-        logNumerators[0] = logPropDens / ss->temperLadder[ll];
-        logDenominators[1] = (*(ss->logMHPropDens))(ss, ll, bb, curr, prop);
-        logNumerators[1] = (*(ss->logMHPropDens))(ss, ll, bb, prop, curr);
-        logAlpha = 0.0;
-        for (ii = 0; ii < 2; ++ii) 
-                logAlpha += logNumerators[ii] - logDenominators[ii];
-        alpha = exp(logAlpha); alpha = MIN(1.0, alpha);
-
-        if (R_FINITE(alpha) == FALSE) {
-                Rprintf("MH: level: %d | block: %d | iter: %d | " \
-                        "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha);
-                Rprintf("The current draw: logDensity: %g\n", logDenominators[0]);
-                utils_SEXP_darray_print(curr, ", ");
-                Rprintf("The proposal draw: logDensity: %g\n", logNumerators[0]);
-                utils_SEXP_darray_print(prop, ", ");
-                error("alpha is non finite, inspect the above numbers\n");
-        }
-        (ppc[bb])->proposed += 1;        
-        if (ss->verboseLevel >= 100) 
-                Rprintf("MH: level: %d | block: %d | iter: %d | " \
-                        "alpha: %5.4g\n", ll, bb, ss->thisIter, alpha);
-        
-        /* MH acceptance rejection step */
-        if (runif(0, 1) <= alpha) {
-                if (ss->verboseLevel >= 10) 
-                        Rprintf("MH: level: %d | block: %d | iter: %d | " \
-                                "alpha: %5.4g [*** accepted]\n",
-                                ll, bb, ss->thisIter, alpha);
-                copy_draw(ss, curr, prop);
-                ss->logDensities[ll] = logPropDens;
-                (ppc[bb])->accepted += 1;
-        }
-        UNPROTECT(1);
-        return 0;                                
 }
 
 
@@ -1447,12 +1241,12 @@ register_this_draw_fixed_iter_with_fitness (Sampler *ss, SEXP SEXPDraws)
         for (kk = 0; kk < ss->nLevelsSaveSampFor; ++kk) {
                 ll  = ss->levelsSaveSampFor[kk];
                 src = REAL(VECTOR_ELT(ss->SEXPCurrDraws, ll));
-                mm  = (kk * ss->nIters * (ss->sampDim + 1)); 
+                mm  = (kk * ss->nSave * (ss->sampDim + 1)); 
                 for (jj = 0; jj < ss->sampDim; ++jj) {
-                        ii       = mm + ss->thisIter + jj * ss->nIters;
+                        ii       = mm + ss->saveIter + jj * ss->nSave;
                         dest[ii] = src[jj];
                 }
-                ii       = mm + ss->thisIter + jj * ss->nIters;
+                ii       = mm + ss->saveIter + jj * ss->nSave;
                 dest[ii] = -ss->logDensities[ll];
                 PHONY(utils_darray_print(src, ss->sampDim, ", "););
         }
@@ -1470,9 +1264,9 @@ register_this_draw_fixed_iter (Sampler *ss, SEXP SEXPDraws)
         for (kk = 0; kk < ss->nLevelsSaveSampFor; ++kk) {
                 ll = ss->levelsSaveSampFor[kk];
                 src = REAL(VECTOR_ELT(ss->SEXPCurrDraws, ll));
-                mm = (kk * ss->nIters * ss->sampDim); 
+                mm = (kk * ss->nSave * ss->sampDim); 
                 for (jj = 0; jj < ss->sampDim; ++jj) {
-                        ii = mm + ss->thisIter + jj * ss->nIters;
+                        ii = mm + ss->saveIter + jj * ss->nSave;
                         dest[ii] = src[jj];
                 }
                 PHONY(utils_darray_print(src, ss->sampDim, ", "););
@@ -1483,7 +1277,8 @@ register_this_draw_fixed_iter (Sampler *ss, SEXP SEXPDraws)
 
 static int
 register_this_draw_fixed_time_with_fitness (Sampler *ss, SEXP SEXPDraws)
-{        
+{
+        /* WRITME */
         return 0;
 }
 
@@ -1491,6 +1286,7 @@ register_this_draw_fixed_time_with_fitness (Sampler *ss, SEXP SEXPDraws)
 static int
 register_this_draw_fixed_time (Sampler *ss, SEXP SEXPDraws)
 {        
+        /* WRITME */
         return 0;
 }
 
@@ -1596,7 +1392,7 @@ sampler_one_iter_with_many_levels (Sampler *ss, SEXP notRequired)
 static int
 sampler_make_draws_fixed_iter (Sampler *ss, SEXP SEXPDraws)
 {
-        int ii, iter = 0, nIters = ss->nIters;
+        int ii, iter = 0, nIters = ss->nIters, nThin = ss->nThin;
         Rboolean initialEstDone = FALSE;
         double timeStartUsr, timeEndUsr, timeToFinish;
         double timeStartSys, timeEndSys;    
@@ -1605,9 +1401,13 @@ sampler_make_draws_fixed_iter (Sampler *ss, SEXP SEXPDraws)
         timeStartUsr = ss->timeDetails->usr;
         timeStartSys = ss->timeDetails->sys;
         GetRNGstate( );
+        ss->saveIter = 0;
         for (ii = 0; ii < nIters; ++ii) {
                 ss->thisIter = ii; (*(ss->samplerOneIter))(ss, R_NilValue);
-                (*(ss->registerThisDraw))(ss, SEXPDraws);
+                if ((ii % nThin) == 0) {
+                        (*(ss->registerThisDraw))(ss, SEXPDraws);
+                        ++(ss->saveIter);
+                }
                 if (ss->verboseLevel >= 1) {
                         iter = ii + 1;
                         if (initialEstDone == FALSE) {
@@ -1650,7 +1450,7 @@ sampler_make_draws_fixed_iter (Sampler *ss, SEXP SEXPDraws)
 static int
 sampler_make_draws_fixed_time (Sampler *ss, SEXP SEXPDraws)
 {
-        int ii, iter = 0, nIters = ss->nIters;
+        int ii, iter = 0, nIters = ss->nIters, nThin = ss->nThin;
         Rboolean initialEstDone = FALSE;
         double timeStartUsr, timeEndUsr, timeToFinish;
         double timeStartSys, timeEndSys;    
@@ -1660,10 +1460,14 @@ sampler_make_draws_fixed_time (Sampler *ss, SEXP SEXPDraws)
         timeStartUsr = ss->timeDetails->usr;
         timeStartSys = ss->timeDetails->sys;
         GetRNGstate( );
+        ss->saveIter = 0;
         /* infinite loop, break out of it if ss->timeInSecs is exceeded  */
         for (ii = 0; ; ++ii) {
                 ss->thisIter = ii; (*(ss->samplerOneIter))(ss, R_NilValue);
-                (*(ss->registerThisDraw))(ss, SEXPDraws);
+                if ((ii % nThin) == 0) {
+                        (*(ss->registerThisDraw))(ss, SEXPDraws);
+                        ++(ss->saveIter);
+                }
                 if (ss->verboseLevel >= 1) {
                         iter = ii + 1;
                         if (initialEstDone == FALSE) {
@@ -1715,14 +1519,11 @@ sampler_init (Sampler *ss)
         /* installing the functions */
         if (ss->logTarDensFunc != R_NilValue)
                 ss->logTarDens = log_target_density_func_user_Rfunc;
-        if (ss->logMHPropDensFunc != R_NilValue) {
-                ss->logMHPropDens = log_MHProposal_density_func_user_Rfunc;
+        if (ss->oneIterMHFunc != R_NilValue) {
+                ss->oneIterMH          = one_iter_MH_user_Rfunc;
                 ss->moveObjs[MH]->func = sampler_move_MH;
-        } else
-                ss->moveObjs[MH]->func = sampler_move_RWM;    
-        if (ss->MHPropNewFunc != R_NilValue)
-                ss->MHPropNew = MHProposal_new_func_user_Rfunc;
-
+        }
+        
         if (nLevels == 1) {
                 ss->samplerOneIter = sampler_one_iter_with_one_level;
         } else if (nLevels == 2) {
@@ -1782,12 +1583,12 @@ make_draws (Sampler *ss)
 {
         /*
          * draws is an array of dimension:
-         * c(nIters, sampDim (+ 1), nLevelsSaveSampFor)
+         * c(nSave, sampDim (+ 1), nLevelsSaveSampFor)
          */
         SEXP draws, drawsDim;
         int ii, nn, *intsTmp, dims[3];
 
-        dims[0] = ss->nIters; dims[2] = ss->nLevelsSaveSampFor;
+        dims[0] = ss->nSave; dims[2] = ss->nLevelsSaveSampFor;
         if (ss->saveFitness == TRUE) dims[1] = ss->sampDim + 1;
         else                         dims[1] = ss->sampDim;
         nn = dims[0] * dims[1] * dims[2];
@@ -2058,7 +1859,6 @@ make_accept_ratios_list (Sampler *ss)
 }
 
 
-
 SEXP
 sampler_run (Sampler *ss)
 {
@@ -2092,7 +1892,7 @@ TOEMCMainC (SEXP argsList)
         Sampler *ss;
         SEXP samplerObj;
         
-        ss                 = sampler_new(argsList);
+        ss = sampler_new(argsList);
         sampler_init(ss);
         PROTECT(samplerObj = sampler_run(ss));        
         UNPROTECT(1);

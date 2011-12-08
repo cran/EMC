@@ -1,5 +1,5 @@
 
-###  $Id: common.R,v 1.15 2008/02/04 17:01:35 goswami Exp $
+###  $Id: common.R,v 1.17 2008/07/06 03:09:12 goswami Exp $
 ###  
 ###  File:    common.R
 ###  Package: EMC
@@ -1097,3 +1097,143 @@ doCall <-
     do.call(what = func, args = c(argsList, dotsList))
 }
 
+### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+.oneIterMHFuncGen.checkLogDens <-
+    function (temperature, block, draw, logDens, level, iter)
+{
+    tmp <- collectVarnames(c('iter', 'level', 'temperature', 'block'),
+                           simplify = TRUE)
+    cat('\n')
+    print(data.frame(value = tmp))
+    cat('The current draw:\n')
+    print(draw)
+    cat('The log density:\n')
+    print(logDens)
+    fatal(paste('In MH, alpha is non finite, or is not of length 1,',
+                'inspect the above numbers'))
+}
+
+
+.oneIterMHFuncGen.checkPropNew <-
+    function (temperature, block, curr, prop, level, iter)
+{
+    tmp <- collectVarnames(c('iter', 'level', 'temperature', 'block'),
+                           simplify = TRUE)
+    print(data.frame(value = tmp))
+    cat('The current draw:\n')
+    print(curr)
+    cat('The proposal draw:\n')
+    print(prop)
+    fatal(paste('In MH, current and proposal draw are not of the same length,',
+                'inspect the above numbers and the MHPropNewFunc'))
+}
+
+
+.oneIterMHFuncGen.checkPropDens <-
+    function (temperature, block, curr, prop, logPropDens, level, iter)
+{
+    tmp <- collectVarnames(c('iter', 'level', 'temperature', 'block', 'logPropDens'),
+                           simplify = TRUE)
+    print(data.frame(value = tmp))
+    cat('The current draw:\n')
+    print(curr)
+    cat('The proposal draw:\n')
+    print(prop)
+    cat('The log proposal density:\n')
+    print(logPropDens)
+    fatal(paste('In MH, logDens of proposal draw is not of length 1,',
+                'inspect the above numbers and the logMHPropDensFunc'))
+}
+
+
+.oneIterMHFuncGen.checkAlpha <-
+    function(temperature, block, curr, prop, level, iter,
+             logDenominators, logNumerators, alpha)
+{
+    tmp <- collectVarnames(c('iter', 'level', 'temperature', 'block', 'logDens'),
+                           simplify = TRUE)
+    print(data.frame(value = tmp))
+    cat('The current draw: logDens:', logDenominators[1], '\n')
+    print(curr)
+    cat('The proposal draw: logDens:', logNumerators[1], '\n')
+    print(prop)
+    fatal('In MH, alpha is non finite, inspect the above numbers')                
+}
+
+
+.oneIterMHFuncGen <-
+    function (lTDF, MHPNF, lMHPDF)
+{
+    func <- 
+        function (temperature, block, draw, logDens, level, iter, ...)
+        {        
+            logDenominators    <- logNumerators <- c(0, 0)
+            logDenominators[1] <- logDens / temperature
+            
+            prop <- MHPNF(temperature = temperature,
+                          block       = block,
+                          currentDraw = draw, ...)
+            if (length(draw) != length(prop))
+                .oneIterMHFuncGen.checkPropNew(temperature = temperature,
+                                               block       = block,
+                                               curr        = draw,
+                                               prop        = prop,
+                                               level       = level,
+                                               iter        = iter)
+
+            logPropDens <- lTDF(prop, ...)
+            if ((length(logPropDens) != 1))
+                .oneIterMHFuncGen.checkLogDens(temperature = temperature,
+                                               block       = block,
+                                               draw        = draw,
+                                               logDens     = logPropDens,
+                                               level       = level,
+                                               iter        = iter)                
+            logNumerators[1] <- logPropDens / temperature
+            
+            if (!is.null(lMHPDF)) {
+                logPropDens <- lMHPDF(temperature  = temperature,
+                                      block        = block,
+                                      currentDraw  = draw,
+                                      proposalDraw = prop, ...)
+                if ((length(logPropDens) != 1) || !is.finite(logPropDens))
+                    .oneIterMHFuncGen.checkPropDens(temperature = temperature,
+                                                    block       = block,
+                                                    curr        = draw,
+                                                    prop        = prop,
+                                                    logPropDens = logPropDens,
+                                                    level       = level,
+                                                    iter        = iter)
+                logDenominators[2] <- logPropDens
+                
+                logPropDens <- lMHPDF(temperature  = temperature,
+                                      block        = block,
+                                      currentDraw  = prop,
+                                      proposalDraw = draw, ...)
+                if ((length(logPropDens) != 1) || !is.finite(logPropDens))
+                    .oneIterMHFuncGen.checkPropDens(temperature = temperature,
+                                                    block       = block,
+                                                    curr        = prop,
+                                                    prop        = draw,
+                                                    logPropDens = logPropDens,
+                                                    level       = level,
+                                                    iter        = iter)
+                logNumerators[2] <- logPropDens
+            }
+            
+            alpha <- min(1.0, exp(sum(logNumerators - logDenominators)))        
+            if (!is.finite(alpha))
+                .oneIterMHFuncGen.checkAlpha(temperature     = temperature,
+                                             block           = block,
+                                             curr            = draw,
+                                             prop            = prop,
+                                             level           = level,
+                                             iter            = iter,
+                                             logDenominators = logDenominators,
+                                             logNumerators   = logNumerators,
+                                             alpha           = alpha)
+            list(prop = prop, logPropDens = logPropDens, alpha = alpha)
+        }
+    as.function(func)
+}

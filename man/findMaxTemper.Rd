@@ -1,5 +1,5 @@
 
-%%% $Id: findMaxTemper.Rd,v 1.20 2008/02/04 17:01:38 goswami Exp $
+%%% $Id: findMaxTemper.Rd,v 1.22 2008/05/26 00:02:53 goswami Exp $
 
 \name{findMaxTemper}
 
@@ -11,6 +11,15 @@
    Multiple MCMC chains based algorithms (e.g., parallel tempering,
    evolutionary Monte Carlo) need a temperature ladder. This function
    finds the maximum temperature for constructing the ladder.
+
+   Below \code{sampDim} refers to the dimension of the sample space,
+   \code{temperLadderLen} refers to the length of the temperature
+   ladder, and \code{levelsSaveSampForLen} refers to the length of
+   \code{levelsSaveSampFor}. Note, this function calls
+   \code{\link{evolMonteCarlo}}, so some of the arguments below have the
+   same name and meaning as the corresponding ones for
+   \code{\link{evolMonteCarlo}}. \emph{See details below for explanation
+   on the arguments}.
 }
 
 \usage{
@@ -36,15 +45,6 @@ findMaxTemper(nIters,
 }
 
 \arguments{  
-  Below \code{sampDim} refers to the dimension of the sample space,
-  \code{temperLadderLen} refers to the length of the temperature ladder,
-  and \code{levelsSaveSampForLen} refers to the length of
-  \code{levelsSaveSampFor}. Note, this function calls
-  \code{\link{evolMonteCarlo}}, so some of the arguments below have the
-  same name and meaning as the corresponding ones for
-  \code{\link{evolMonteCarlo}}. \emph{See details below for explanation
-  on the following arguments}.
-
   \item{nIters}{\code{integer} \eqn{>} 0.}
 
   \item{statsFuncList}{\code{list} of functions of one argument
@@ -139,9 +139,7 @@ findMaxTemper(nIters,
       upperLimit)} is a two-tuple of positive numbers, where the
       \code{lowerLimit} is usually 1 and \code{upperLimit} is a number
       in [100, 1000]. If stochastic optimization (via sampling) is the
-      goal, then \code{lowerLimit} is taken to be in [0, 1]. Often the
-      \code{upperLimit} is the maximum temperature as suggested by
-      \code{\link{findMaxTemper}}.}
+      goal, then \code{lowerLimit} is taken to be in [0, 1].}
 
     \item{\code{ladderLen}, \code{scheme} and \code{schemeParam}}{These
       three parameters are required (along with \code{temperLimits}) if
@@ -163,7 +161,7 @@ findMaxTemper(nIters,
     }
 
     We recommended using \code{scheme = 'exponential'} and
-    \code{schemeParam} in [0.3, 0.5].
+    \code{schemeParam} in [0.3, 0.5].    
     
     \item{\code{cutoffDStats}}{This cutoff comes from \eqn{Normal_1(0,
       1)}, the standard normal distribution (Goswami and Liu, 2007); the
@@ -276,6 +274,7 @@ findMaxTemper(nIters,
   \code{\link{evolMonteCarlo}}}
 
 \examples{
+\dontrun{
 coord1        <- function (xx) { xx[1] }
 ss            <- function (xx) { sum(xx) }
 pp            <- function (xx) { prod(xx) }
@@ -308,6 +307,7 @@ with(maxTemperObj,
               ylab = as.expression(substitute(x[xii], list(xii = 2))))   
      }
  })
+}
 }
 
 \keyword{methods}

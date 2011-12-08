@@ -1,5 +1,5 @@
 
-%%% $Id: placeTempers.Rd,v 1.17 2008/02/04 17:01:38 goswami Exp $
+%%% $Id: placeTempers.Rd,v 1.18 2008/05/26 00:02:53 goswami Exp $
 
 \name{placeTempers}
 
@@ -12,6 +12,15 @@
   evolutionary Monte Carlo) need a temperature ladder. This function
   places the intermediate temperatures between the minimum and the
   maximum temperature for the ladder.
+
+  Below \code{sampDim} refers to the dimension of the sample space,
+  \code{temperLadderLen} refers to the length of the temperature ladder,
+  and \code{levelsSaveSampForLen} refers to the length of
+  \code{levelsSaveSampFor}. Note, this function calls
+  \code{\link{evolMonteCarlo}}, so some of the arguments below have the
+  same name and meaning as the corresponding ones for
+  \code{\link{evolMonteCarlo}}. \emph{See details below for explanation
+  on the arguments}.  
 } 
 
 \usage{
@@ -34,16 +43,8 @@ placeTempers(nIters,
              \dots)                  
 }
 
-\arguments{
-  Below \code{sampDim} refers to the dimension of the sample space,
-  \code{temperLadderLen} refers to the length of the temperature ladder,
-  and \code{levelsSaveSampForLen} refers to the length of
-  \code{levelsSaveSampFor}. Note, this function calls
-  \code{\link{evolMonteCarlo}}, so some of the arguments below have the
-  same name and meaning as the corresponding ones for
-  \code{\link{evolMonteCarlo}}. \emph{See details below for explanation
-  on the following arguments}.
 
+\arguments{ 
   \item{nIters}{\code{integer} \eqn{>} 0.}
 
   \item{acceptRatioLimits}{\code{double} vector of \emph{two
@@ -101,10 +102,12 @@ placeTempers(nIters,
   This function is based on the temperature placement method introduced
   in section 4.2 of Goswami and Liu (2007).
 
-  \describe{ \item{\code{acceptRatioLimits}}{This is a range for the
-    estimated acceptance ratios for the random exchange move for the
-    consecutive temperature levels of the final ladder. It is
-    recommended that specified range is between 0.3 and 0.6.}
+  \describe{
+    
+    \item{\code{acceptRatioLimits}}{This is a range for the estimated
+      acceptance ratios for the random exchange move for the consecutive
+      temperature levels of the final ladder. It is recommended that
+      specified range is between 0.3 and 0.6.}
     
     \item{\code{ladderLenMax}}{It is preferred that one specifies
       \code{acceptRatioLimits} for constructing the final temperature
@@ -244,6 +247,7 @@ placeTempers(nIters,
   \code{\link{evolMonteCarlo}}}
 
 \examples{
+\dontrun{
 placeTempersObj <-
     with(VShapedFuncGenerator(-13579),
          placeTempers(nIters            = 10000,
@@ -273,6 +277,7 @@ with(placeTempersObj,
               ylab = as.expression(substitute(x[xii], list(xii = 2))))   
      }
  })
+}
 }
 
 \keyword{methods}

@@ -1,5 +1,5 @@
 
-%%% $Id: evolMonteCarlo.Rd,v 1.21 2008/02/04 17:01:38 goswami Exp $
+%%% $Id: evolMonteCarlo.Rd,v 1.22 2008/07/06 03:09:12 goswami Exp $
 
 \name{evolMonteCarlo}
 
@@ -12,6 +12,11 @@
   (possibly asymmetric) proposal distribution and a temperature ladder,
   this function produces samples from the target using the evolutionary
   Monte Carlo algorithm.
+
+  Below \code{sampDim} refers to the dimension of the sample space,
+  \code{temperLadderLen} refers to the length of the temperature ladder,
+  and \code{levelsSaveSampForLen} refers to the length of the
+  \code{levelsSaveSampFor}.
 }
 
 \usage{
@@ -27,18 +32,14 @@ evolMonteCarlo(nIters,
                moveNTimesList    = NULL,              
                SCRWMNTimes       = NULL,                     
                SCRWMPropSD       = NULL,                         
-               levelsSaveSampFor = NULL,           
+               levelsSaveSampFor = NULL,
+               nThin             = 1,
                saveFitness       = FALSE,                
                verboseLevel      = 0,
                \dots)                   
 }
 
 \arguments{
-  Below \code{sampDim} refers to the dimension of the sample space,
-  \code{temperLadderLen} refers to the length of the temperature ladder,
-  and \code{levelsSaveSampForLen} refers to the length of the
-  \code{levelsSaveSampFor}.
-
   \item{nIters}{\code{integer} \eqn{>} 0.}
 
   \item{temperLadder}{\code{double} vector with all \emph{positive}
@@ -83,6 +84,9 @@ evolMonteCarlo(nIters,
 
   \item{levelsSaveSampFor}{\code{integer} vector with \emph{positive}
     entries.}
+
+  \item{nThin}{\code{integer} \eqn{\ge}{>=} 1. Every \code{nThin} draw is
+    saved.}
 
   \item{saveFitness}{\code{logical}.}
 
@@ -191,13 +195,14 @@ moveNTimesList = list(MH = 1,
     }
 }
 
-\value{
-  This function returns a list with the following components:
+\value{ 
+  Below \code{nSave} refers to \code{ceil(nIters / nThin)}. This
+  function returns a list with the following components:
 
-  \item{draws}{\code{array} of dimension \code{nIters} \eqn{\times}{x}
+  \item{draws}{\code{array} of dimension \code{nSave} \eqn{\times}{x}
     \code{sampDim} \eqn{\times}{x} \code{levelsSaveSampForLen}, if
     \code{saveFitness = FALSE}. If \code{saveFitness = TRUE}, then the
-    returned array is of dimension \code{nIters} \eqn{\times}{x}
+    returned array is of dimension \code{nSave} \eqn{\times}{x}
     \code{(sampDim + 1)} \eqn{\times}{x} \code{levelsSaveSampForLen};
     i.e., each of the \code{levelsSaveSampForLen} matrices contain the
     fitness values in their last column.}
@@ -210,6 +215,10 @@ moveNTimesList = list(MH = 1,
 
   \item{nIters}{the \code{nIters} argument.}
 
+  \item{nThin}{the \code{nThin} argument.}
+
+  \item{nSave}{as defined above.}
+  
   \item{temperLadder}{the \code{temperLadder} argument.}
 
   \item{startingVals}{the \code{startingVals} argument.}
@@ -283,6 +292,7 @@ moveNTimesList = list(MH = 1,
 \seealso{\code{\link{parallelTempering}}}
 
 \examples{
+\dontrun{
 samplerObj <-
     with(VShapedFuncGenerator(-13579),
      {
@@ -318,6 +328,7 @@ with(samplerObj,
               ylab = as.expression(substitute(x[xii], list(xii = 2))))
      }
  })
+}
 }
 
 \keyword{methods}
